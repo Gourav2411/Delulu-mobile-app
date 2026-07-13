@@ -1,0 +1,209 @@
+{
+  "project_name": "Delulu - Interactive Fiction App",
+  "app_type": "hybrid_fullstack",
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic outputs. Avoid 'AI slop'.",
+    "Use dark colors independently without simplistic gradients. DO NOT use generic purple/violet gradients on white.",
+    "NO centered-equal-spacing generic cards. Create depth with z-index hierarchy and overlapping.",
+    "Use glass-morphism effects with backdrop filters (backdrop-blur-xl).",
+    "DO NOT apply universal transitions (e.g., transition: all). Add specific transitions.",
+    "DO NOT center align the app container. Respect natural reading flow.",
+    "NEVER use emoji characters for icons. Use expo/vector-icons (@expo/vector-icons ionicons/feather set).",
+    "Every interaction needs micro-animations (hover states, tap scales, parallax).",
+    "Subtle grain textures, noise overlays, and halftone patterns separate good from extraordinary.",
+    "Use test IDs on all interactive elements via data-testid.",
+    "You have .js files not .tsx files, so write all React components using standard .js and PropTypes if needed.",
+    "Strict Dark Mode ONLY. No light mode fallbacks."
+  ],
+  "typography": {
+    "headings": {
+      "fontFamily": "Space Grotesk",
+      "weight": "bold",
+      "usage": "Display headings, chapter titles, choice text, SFX comic lettering."
+    },
+    "body": {
+      "fontFamily": "Inter",
+      "fontSize": "16px",
+      "lineHeight": "1.5",
+      "usage": "Chat reader text, body paragraphs, button labels."
+    },
+    "numerals": {
+      "fontFamily": "Inter",
+      "fontVariantNumeric": "tabular-nums",
+      "usage": "Gem costs, timers, streak counters."
+    }
+  },
+  "colors": {
+    "theme": "Dark Mode ONLY",
+    "backgrounds": {
+      "main": "#0A0A0F",
+      "surface": "#16161F",
+      "elevated": "#1E1E2A",
+      "glass": "rgba(22, 22, 31, 0.7)"
+    },
+    "text": {
+      "primary": "#F5F5F7",
+      "secondary": "#9B9BA8"
+    },
+    "accents": {
+      "romance": "#FF3E8A",
+      "thriller": "#3E9BFF",
+      "horror": "#E5273E",
+      "scifi": "#7C5CFF",
+      "drama": "#FF8A3E",
+      "gem_gold": "#FFC94A",
+      "success": "#4ADE80",
+      "border": "#2A2A38"
+    },
+    "gradients": {
+      "genre_hero": "linear-gradient(135deg, var(--genre-accent) 0%, #0A0A0F 100%)",
+      "app_icon": "linear-gradient(to bottom right, #FF3E8A 0%, #0A0A0F 100%)",
+      "premium_card": "linear-gradient(135deg, rgba(255, 201, 74, 0.15) 0%, rgba(26, 26, 31, 0) 100%)"
+    }
+  },
+  "visual_enhancers": {
+    "art_style": "Webtoon originals meets Spider-Verse comic style. Bold clean ink outlines, cel shading, halftone.",
+    "borders": "1px solid #2A2A38 for most surfaces. Panels use thicker dynamic borders.",
+    "glassmorphism": "Use backdrop-blur-xl combined with surface colors at 70% opacity.",
+    "overlays": "Never use fully transparent backgrounds for overlays. Minimum background should be rgba(10, 10, 15, 0.85).",
+    "shadows": "Hard offset shadows (comic book style) rather than soft blur shadows."
+  },
+  "grids": {
+    "system": "8pt grid system",
+    "spacing": {
+      "xs": "4px",
+      "sm": "8px",
+      "md": "16px",
+      "lg": "24px",
+      "xl": "32px",
+      "xxl": "48px"
+    }
+  },
+  "layouts": {
+    "bottom_nav": {
+      "items": ["Home", "Search", "Library", "Gems", "Profile"],
+      "active_state": "Tinted with current genre accent color or Romance (#FF3E8A) as default."
+    },
+    "modals_vs_sheets": {
+      "gem_purchases": "Bottom sheet (preserves user context within the immersive app flow).",
+      "item_preview": "Bottom sheet.",
+      "name_character": "Bottom sheet.",
+      "ending_share": "Full screen (maximizes canvas for art display and social share rows)."
+    }
+  },
+  "component_specs": {
+    "ChatReader": {
+      "layout": "Immersive full-screen. No bottom nav. Top-edge tap-to-exit bar (height: 48px). Chapter title bar at top.",
+      "interaction": "Tap-anywhere to reveal next message. Typing indicator (3 dots bouncing) precedes NPC messages.",
+      "npc_portrait": "Dockable. Small: 96px width docked top-right. Large: 40% screen anchored bottom/center.",
+      "speech_bubbles": "Comic balloon style with directional tail. User: aligned right. NPC: aligned left. Max-width: 80%. Bubble padding: 16px. Background: #1E1E2A (NPC) or GenreAccent/20 (User).",
+      "sfx_lettering": "Space Grotesk bold, italicized. Scale-pop entry animation. Absolute positioning.",
+      "scene_panel_takeover": "Full-screen bordered comic frame with halftone burst in genre accent."
+    },
+    "AvatarBuilderCanvas": {
+      "aspect_ratio": "3:4",
+      "z_index_stack": [
+        "1. Background (Halftone/Solid)",
+        "2. Body/Skin Tone",
+        "3. Eyes/Mouth",
+        "4. Hair Base",
+        "5. Clothes",
+        "6. Hair Front",
+        "7. Accessories"
+      ],
+      "category_tab_bar_height": "56px (scrollable horizontally)",
+      "item_grid_card_size": "80px by 80px, 1px border. Selected state gets 2px genre accent border.",
+      "price_badge_position": "Top-right overlap (-8px top, -8px right)"
+    },
+    "ChoiceMoment": {
+      "backdrop": "Dimmed background at 80% opacity (#0A0A0F) with backdrop-blur-sm.",
+      "card_stack_spacing": "16px gap.",
+      "cards": "Glassmorphic comic-panel style. 1px border. Hover/Press scales down slightly.",
+      "premium_treatment": "1px gold (#FFC94A) border, gold gradient background, gem cost badge top right, tiny helper line under option text ('Unlock special scene')."
+    }
+  },
+  "motion": {
+    "haptics": {
+      "bubble_reveal": "impactLight",
+      "choice_tap": "impactMedium",
+      "gem_purchase": "impactHeavy + Confetti",
+      "look_save": "impactHeavy + Flash",
+      "streak_claim": "impactMedium + Flame Shake"
+    },
+    "animations": {
+      "sfx": "Scale from 0.5 to 1.2, then settle to 1.0 (spring physics).",
+      "typing_indicator": "Staggered vertical bounce (dots).",
+      "choice_appear": "Slide up and fade in from bottom, staggered by 100ms.",
+      "avatar_reveal": "Confetti burst + scale pop."
+    }
+  },
+  "copywriting": {
+    "voice": "Chronically online bestie. Playful, self-aware.",
+    "examples": {
+      "timer": "patience isn't very delulu of you... 15 gems says otherwise",
+      "empty_closet": "you can't romance the lead in THAT fit",
+      "empty_library": "it's giving... nothing. let's find you a story.",
+      "loading": "manifesting...",
+      "error": "bestie the wifi is acting up, give it a sec",
+      "ending": "X% of readers were delulu enough to get this ending"
+    }
+  },
+  "media": {
+    "icons": "@expo/vector-icons (Feather or Ionicons). No emoji.",
+    "illustrations": "Comic-style webtoon. Use halftone filters on images if exact matches aren't available."
+  },
+  "image_urls": {
+    "covers": {
+      "romance": "https://images.unsplash.com/photo-1760493608711-09ead5e0b7ab?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwzfHxhbmltZSUyMHN0eWxlJTIwcG9ydHJhaXQlMjBkYXJrJTIwcm9tYW5jZXxlbnwwfHx8fDE3ODM5NTkzNTl8MA&ixlib=rb-4.1.0&q=85",
+      "thriller": "https://images.unsplash.com/photo-1671421859756-106403922cb5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHw0fHxjb21pYyUyMGJvb2slMjBwYW5lbCUyMGlsbHVzdHJhdGlvbiUyMHRocmlsbGVyfGVufDB8fHx8MTc4Mzk1OTM1OXww&ixlib=rb-4.1.0&q=85",
+      "scifi": "https://images.unsplash.com/photo-1777891257485-fb26c465076f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxjeWJlcnB1bmslMjBuZW9uJTIwcG9ydHJhaXQlMjBzY2ktZml8ZW58MHx8fHwxNzgzOTU5MzU5fDA&ixlib=rb-4.1.0&q=85",
+      "drama": "https://images.unsplash.com/photo-1587930734782-4fe289d9ea8f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwxfHxhbmltZSUyMHN0eWxlJTIwcG9ydHJhaXQlMjBkYXJrJTIwcm9tYW5jZXxlbnwwfHx8fDE3ODM5NTkzNTl8MA&ixlib=rb-4.1.0&q=85"
+    },
+    "npc_portraits": {
+      "description": "3 characters x 6 expressions. Using placeholders that approximate the tone. Apply CSS halftone or comic filters.",
+      "urls": [
+        "https://placehold.co/400x600/1E1E2A/F5F5F7?text=NPC+1+Neutral",
+        "https://placehold.co/400x600/1E1E2A/F5F5F7?text=NPC+1+Happy",
+        "https://placehold.co/400x600/1E1E2A/F5F5F7?text=NPC+1+Flirty",
+        "https://placehold.co/400x600/1E1E2A/F5F5F7?text=NPC+1+Angry",
+        "https://placehold.co/400x600/1E1E2A/F5F5F7?text=NPC+1+Shocked",
+        "https://placehold.co/400x600/1E1E2A/F5F5F7?text=NPC+1+Sad",
+        "https://placehold.co/400x600/16161F/9B9BA8?text=NPC+2+Set...",
+        "https://placehold.co/400x600/0A0A0F/4ADE80?text=NPC+3+Set..."
+      ]
+    },
+    "scene_panels": [
+      "https://images.unsplash.com/photo-1593345216067-47a359874578?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwyfHxjb21pYyUyMGJvb2slMjBwYW5lbCUyMGlsbHVzdHJhdGlvbiUyMHRocmlsbGVyfGVufDB8fHx8MTc4Mzk1OTM1OXww&ixlib=rb-4.1.0&q=85",
+      "https://placehold.co/800x1200/16161F/FF3E8A?text=Romantic+Scene+Panel+Burst"
+    ],
+    "avatar_layers": {
+      "description": "Placeholder layers for avatar builder (15 items). Since transparent layered PNGs are unavailable, use gradient colored blocks mapped to z-index.",
+      "urls": [
+        "https://placehold.co/400x400/0A0A0F/FFF?text=Body+Tone+1",
+        "https://placehold.co/400x400/0A0A0F/FFF?text=Body+Tone+2",
+        "https://placehold.co/400x400/0A0A0F/FFF?text=Body+Tone+3",
+        "https://placehold.co/400x400/transparent/FF3E8A?text=Eyes+Happy",
+        "https://placehold.co/400x400/transparent/FF3E8A?text=Mouth+Smirk",
+        "https://placehold.co/400x400/transparent/FF3E8A?text=Mouth+Pout",
+        "https://placehold.co/400x400/transparent/9B9BA8?text=Hair+Base+Short",
+        "https://placehold.co/400x400/transparent/9B9BA8?text=Hair+Base+Long",
+        "https://placehold.co/400x400/transparent/9B9BA8?text=Hair+Front+Bangs",
+        "https://placehold.co/400x400/transparent/3E9BFF?text=Outfit+Casual",
+        "https://placehold.co/400x400/transparent/3E9BFF?text=Outfit+Prep",
+        "https://placehold.co/400x400/transparent/FFC94A?text=Outfit+Premium+Gown",
+        "https://placehold.co/400x400/transparent/F5F5F7?text=Accessory+Glasses",
+        "https://placehold.co/400x400/transparent/FFC94A?text=Accessory+Earrings",
+        "https://placehold.co/400x400/transparent/E5273E?text=Accessory+Choker"
+      ]
+    }
+  },
+  "instructions_to_main_agent": [
+    "Prioritize the READER screen and AVATAR BUILDER as hero surfaces.",
+    "Implement the 'delulu is the solulu' brand heavily via the copy objects provided.",
+    "Ensure the avatar layer z-index system is strictly maintained using absolute positioning.",
+    "Implement all micro-interactions using framer-motion or React Native Reanimated equivalent.",
+    "Use expo-haptics extensively linked to user choices and gem purchases.",
+    "Enforce dark mode strictly. There is no light mode fallback.",
+    "All components should use 'data-testid' for QA testing."
+  ]
+}
