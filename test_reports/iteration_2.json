@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 2 tested the three user-reported bug fixes (genre row alignment, profile character-builder CTA, currency toggle) plus new Option D features (currency-aware /api/gems/packs, avatar presets, story chat rate-limit). Backend: 38/38 pytest passed (27 regression + 11 new). Frontend: Full mobile-viewport E2E on 390x844 through signup->avatar preset save->home->profile->gems currency-swap. All three user bugs are FIXED and verified. One CRITICAL frontend crash discovered on auth validation errors (renders Pydantic error list as React child).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "app/auth.tsx", "issue": "When backend returns 422 (validation error) on /api/auth/signup, the frontend tries to render error.detail directly, but detail is a LIST of Pydantic error objects — throws 'Objects are not valid as a React child (found: object with keys {type, loc, msg, input, ctx})' and crashes the auth screen into a red-screen error overlay. Repro: submit signup with a valid email but leave any field slightly off (e.g. very short password from a form that doesn't client-side validate) and watch it crash. Reference: app/auth.tsx (calls signup/login and surfaces err.detail). Priority HIGH — any 422 from ANY auth endpoint currently crashes the entire auth screen.", "testID": "n/a", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_regression.xml",
+    "/app/test_reports/pytest/pytest_iter2.xml"
+  ],
+  "action_items": [
+    "FIX AUTH CRASH: In app/auth.tsx, normalize FastAPI error bodies. FastAPI 422 returns { detail: [ { type, loc, msg, input, ctx }, ... ] } — the client currently renders this list as a React child. Wrap: `const msg = Array.isArray(err.detail) ? err.detail.map(e => e.msg).join(', ') : (typeof err.detail === 'string' ? err.detail : 'something went sideways')`.",
+    "Consider adding client-side password >= 6 char validation before hitting the API so 422s are rarer.",
+    "Optional: add a subtle 'save' toast on Gems screen when currency is switched so users know the selection persisted (currently only the chip label changes)."
+  ],
+  "critical_code_review_comments": [
+    "app/(tabs)/home.tsx: genreGrid now uses `flexDirection:'row', gap:6` with each genreIcon `flex:1, aspectRatio:1` — this correctly produces the single-row layout on 390px viewport (measured 64x64 each, gap 6, total ~340px + 24px side padding = 388px, fits with 2px slack). Nice fix.",
+    "app/(tabs)/gems.tsx: currency picker uses testID='currency-picker-btn' + per-option testIDs matching the spec exactly.",
+    "app/(tabs)/profile.tsx: The 'change my character' CTA (testID='profile-edit-avatar') is prominent below the avatar (188x37 pink pill), and the avatar image itself is also tappable — meets both requirements from the review.",
+    "server.py: currency table CURRENCY_PRICES uses INR 79/399/799/1499 with symbol ₹ — matches spec exactly. Unknown currency falls back to USD via `_price_for`, verified.",
+    "server.py: /api/story/chat enforces CHAT_MAX_PER_CHAPTER=4 server-side via chatQuota dict, 5th call returns 403. Also strips literal '\\\\n\\\\n' from Claude output so bubbles are clean.",
+    "server.py is now 872 lines — well over the 700 recommended ceiling. Recommend splitting into routers (auth, avatar, stories, gems, chat) as noted in iteration_1."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py (new — 11 tests covering currency packs, avatar presets, story chat rate-limit)"
+  ],
+  "success_rate": {"backend": "100% (38/38 combined)", "frontend": "~90% (3/3 user-bug fixes verified; 1 pre-existing auth-error rendering crash uncovered but does not block happy path)"},
+  "seed_data_creation": "No manual seed; test users created via API signup with prefixes iter2_/chat_/chatlim_/ui{timestamp}_ — all throwaway.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend URL https://chat-fiction-lab.preview.emergentagent.com. UI signup FLOW must use in-browser fetch to /api/auth/signup then login via the 'log in' tab — the sign-up form in the UI attempts client validation on a 3rd 'confirm password' field which is fragile in Playwright, and a 422 will crash the app until the auth.tsx error-message fix ships. Home genre row is one line of 5 cards (~64px each). Currency chip is at Gems > 'gem packs' section header (testID='currency-picker-btn'); modal has 13 options currency-option-{USD,INR,EUR,GBP,AED,BRL,JPY,CAD,AUD,SGD,MXN,PHP,IDR}. INR prices verified: ₹79 / ₹399 / ₹799 / ₹1,499. Preset presets 1-6 at /api/media/preset_avatar_{1..6}.png. Story chat quota key format: `${storyId}:${chapterIndex}:${characterId}`.",
+  "rca_of_issue": "Auth screen crash RCA: FastAPI validation errors serialize `detail` as a LIST of dicts (`[{type, loc, msg, input, ctx}]`). The current client error surface in app/auth.tsx passes this into a <Text> or JSX literal, which React refuses to render (objects/lists are not valid children). The fix is a 2-line coercion at the error boundary: `const msg = Array.isArray(detail) ? detail.map(e=>e.msg).join(', ') : String(detail || 'error');`. Not a regression from this iteration's changes — pre-existing bug surfaced only when a 422 happens (missing/malformed fields)."
+}

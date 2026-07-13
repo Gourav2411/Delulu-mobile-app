@@ -68,7 +68,12 @@ export default function Profile() {
         {/* Avatar showcase */}
         <View style={styles.showcase}>
           <LinearGradient colors={[`${COLORS.romance}44`, "transparent"]} style={StyleSheet.absoluteFill} />
-          <View style={styles.avatarBox} testID="profile-avatar">
+          <TouchableOpacity
+            testID="profile-avatar"
+            activeOpacity={0.85}
+            onPress={() => { Haptics.selectionAsync(); router.push("/avatar-builder"); }}
+            style={styles.avatarBox}
+          >
             <AvatarPreview
               layers={user?.avatarConfig?.layers || {}}
               catalog={catalog}
@@ -76,7 +81,10 @@ export default function Profile() {
               size={180}
               showHalo
             />
-          </View>
+            <View style={styles.tapAvatarHint}>
+              <Ionicons name="brush" size={12} color={COLORS.bg} />
+            </View>
+          </TouchableOpacity>
           <Text style={styles.name}>{displayName}</Text>
           <View style={styles.badge}>
             <Ionicons name="book" size={12} color={COLORS.romance} />
@@ -86,9 +94,10 @@ export default function Profile() {
             testID="profile-edit-avatar"
             onPress={() => { Haptics.selectionAsync(); router.push("/avatar-builder"); }}
             style={styles.editAvatar}
+            activeOpacity={0.85}
           >
-            <Ionicons name="create-outline" size={14} color={COLORS.text} />
-            <Text style={styles.editAvatarText}>edit look</Text>
+            <Ionicons name="brush" size={16} color={COLORS.bg} />
+            <Text style={styles.editAvatarText}>change my character</Text>
           </TouchableOpacity>
         </View>
 
@@ -183,12 +192,13 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: SPACING.lg, paddingBottom: SPACING.sm },
   title: { color: COLORS.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.6 },
   showcase: { alignItems: "center", paddingVertical: SPACING.lg, position: "relative" },
-  avatarBox: { width: 190, height: 220, borderRadius: RADIUS.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  avatarBox: { width: 190, height: 220, borderRadius: RADIUS.lg, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" },
+  tapAvatarHint: { position: "absolute", top: 8, right: 8, backgroundColor: COLORS.romance, width: 26, height: 26, borderRadius: 999, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: COLORS.surface },
   name: { color: COLORS.text, fontSize: 22, fontWeight: "900", marginTop: SPACING.md, letterSpacing: -0.5 },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.pill, backgroundColor: `${COLORS.romance}22`, borderWidth: 1, borderColor: COLORS.romance },
   badgeText: { color: COLORS.romance, fontSize: 11, fontWeight: "800" },
-  editAvatar: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.border, marginTop: 10 },
-  editAvatarText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
+  editAvatar: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: RADIUS.pill, backgroundColor: COLORS.romance, marginTop: 14 },
+  editAvatarText: { color: COLORS.bg, fontSize: 13, fontWeight: "800" },
   statsRow: { flexDirection: "row", padding: SPACING.lg, gap: SPACING.sm },
   statCard: { flex: 1, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, padding: SPACING.md, alignItems: "center" },
   statVal: { color: COLORS.text, fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"] },

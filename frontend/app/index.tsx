@@ -15,8 +15,9 @@ export default function Index() {
       router.replace("/onboarding");
       return;
     }
-    const hasAvatar = user.avatarConfig && Object.keys(user.avatarConfig.layers || {}).length >= 3;
-    if (!hasAvatar) {
+    const hasLayered = user.avatarConfig && Object.keys(user.avatarConfig.layers || {}).length >= 3;
+    const hasPreset = !!user.avatarConfig?.imageUrl || !!user.avatarConfig?.presetId;
+    if (!hasLayered && !hasPreset) {
       router.replace("/avatar-builder");
       return;
     }

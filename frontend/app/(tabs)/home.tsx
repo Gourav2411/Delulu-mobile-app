@@ -158,8 +158,8 @@ export default function Home() {
           <View style={styles.genreGrid}>
             {GENRE_ORDER.map((g) => (
               <View key={g} style={[styles.genreIcon, { backgroundColor: `${GENRE_ACCENT[g]}22`, borderColor: GENRE_ACCENT[g] }]}>
-                <Ionicons name={genreIcon(g)} size={22} color={GENRE_ACCENT[g]} />
-                <Text style={styles.genreLabel}>{cap(g)}</Text>
+                <Ionicons name={genreIcon(g)} size={18} color={GENRE_ACCENT[g]} />
+                <Text style={styles.genreLabel} numberOfLines={1}>{cap(g)}</Text>
               </View>
             ))}
           </View>
@@ -241,8 +241,8 @@ const styles = StyleSheet.create({
   contChapter: { color: COLORS.secondary, fontSize: 11 },
   progressBar: { height: 4, borderRadius: 999, backgroundColor: COLORS.elevated, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 999 },
-  genreGrid: { flexDirection: "row", gap: SPACING.sm, flexWrap: "wrap" },
-  genreIcon: { flex: 1, minWidth: 60, aspectRatio: 1, borderRadius: RADIUS.md, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 4 },
+  genreGrid: { flexDirection: "row", gap: 6 },
+  genreIcon: { flex: 1, aspectRatio: 1, borderRadius: RADIUS.md, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 2 },
   genreLabel: { color: COLORS.text, fontSize: 10, fontWeight: "700" },
   storyCard: { width: 150, height: 210, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden", position: "relative" },
   storyCover: { ...StyleSheet.absoluteFillObject },

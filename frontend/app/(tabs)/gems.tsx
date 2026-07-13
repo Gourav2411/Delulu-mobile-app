@@ -1,6 +1,6 @@
 // Gem store — daily claim + packs (mock IAP)
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,6 +10,24 @@ import { gemsApi } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
 import { detectCurrency, formatPrice } from "@/src/currency";
+import { storage } from "@/src/utils/storage";
+
+const CURRENCY_KEY = "delulu.currency.override";
+const CURRENCIES = [
+  { code: "USD", label: "US Dollar", flag: "🇺🇸" },
+  { code: "INR", label: "Indian Rupee", flag: "🇮🇳" },
+  { code: "EUR", label: "Euro", flag: "🇪🇺" },
+  { code: "GBP", label: "British Pound", flag: "🇬🇧" },
+  { code: "AED", label: "UAE Dirham", flag: "🇦🇪" },
+  { code: "BRL", label: "Brazilian Real", flag: "🇧🇷" },
+  { code: "JPY", label: "Japanese Yen", flag: "🇯🇵" },
+  { code: "CAD", label: "Canadian Dollar", flag: "🇨🇦" },
+  { code: "AUD", label: "Australian Dollar", flag: "🇦🇺" },
+  { code: "SGD", label: "Singapore Dollar", flag: "🇸🇬" },
+  { code: "MXN", label: "Mexican Peso", flag: "🇲🇽" },
+  { code: "PHP", label: "Philippine Peso", flag: "🇵🇭" },
+  { code: "IDR", label: "Indonesian Rupiah", flag: "🇮🇩" },
+];
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -17,22 +35,34 @@ export default function Gems() {
   const { user, refresh } = useAuth();
   const { msg } = useLocalSearchParams();
   const [packs, setPacks] = useState([]);
-  const [currency] = useState(() => detectCurrency());
+  const [currency, setCurrency] = useState("USD");
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(msg || null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = async () => {
+  const load = async (curCode) => {
     try {
-      const { packs } = await gemsApi.packs(currency);
+      const { packs } = await gemsApi.packs(curCode);
       setPacks(packs);
     } catch {}
   };
 
+  const changeCurrency = async (code) => {
+    Haptics.selectionAsync();
+    setCurrency(code);
+    setShowCurrencyPicker(false);
+    await storage.setItem(CURRENCY_KEY, code);
+    await load(code);
+  };
+
   useEffect(() => {
     (async () => {
-      await load();
+      const saved = await storage.getItem(CURRENCY_KEY, null);
+      const chosen = saved || detectCurrency();
+      setCurrency(chosen);
+      await load(chosen);
       setLoading(false);
     })();
   }, []);
@@ -67,7 +97,7 @@ export default function Gems() {
     }
   };
 
-  const onRefresh = async () => { setRefreshing(true); await load(); await refresh(); setRefreshing(false); };
+  const onRefresh = async () => { setRefreshing(true); await load(currency); await refresh(); setRefreshing(false); };
 
   const streak = user?.streak ?? 0;
 
@@ -128,7 +158,19 @@ export default function Gems() {
 
         {/* Packs */}
         <View style={{ gap: SPACING.sm }}>
-          <Text style={styles.sectionHeader}>gem packs</Text>
+          <View style={styles.packsHead}>
+            <Text style={styles.sectionHeader}>gem packs</Text>
+            <TouchableOpacity
+              testID="currency-picker-btn"
+              onPress={() => { Haptics.selectionAsync(); setShowCurrencyPicker(true); }}
+              activeOpacity={0.85}
+              style={styles.currencyChip}
+            >
+              <Ionicons name="globe-outline" size={14} color={COLORS.text} />
+              <Text style={styles.currencyChipText}>{currency}</Text>
+              <Ionicons name="chevron-down" size={14} color={COLORS.secondary} />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.sectionNote}>real Play Billing wires later — these use a mock service.</Text>
           {packs.map((p) => (
             <TouchableOpacity
@@ -157,8 +199,43 @@ export default function Gems() {
           ))}
         </View>
 
-        <Text style={styles.legal}>MOCK PurchaseService · prices in {currency} · dev buttons for now</Text>
+        <Text style={styles.legal}>MOCK PurchaseService · dev buttons for now</Text>
       </ScrollView>
+
+      {/* Currency picker modal */}
+      <Modal visible={showCurrencyPicker} transparent animationType="fade" onRequestClose={() => setShowCurrencyPicker(false)}>
+        <View style={styles.currBackdrop}>
+          <View style={styles.currSheet}>
+            <View style={styles.currHandle} />
+            <Text style={styles.currTitle}>currency</Text>
+            <Text style={styles.currSub}>Play Store handles real IAP per country · this preview lets you switch anytime.</Text>
+            <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ padding: SPACING.md, gap: 6 }}>
+              {CURRENCIES.map((c) => {
+                const active = currency === c.code;
+                return (
+                  <TouchableOpacity
+                    key={c.code}
+                    testID={`currency-option-${c.code}`}
+                    onPress={() => changeCurrency(c.code)}
+                    activeOpacity={0.85}
+                    style={[styles.currRow, active && { borderColor: COLORS.romance, backgroundColor: `${COLORS.romance}18` }]}
+                  >
+                    <Text style={{ fontSize: 22 }}>{c.flag}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.currCode}>{c.code}</Text>
+                      <Text style={styles.currLabel}>{c.label}</Text>
+                    </View>
+                    {active && <Ionicons name="checkmark-circle" size={22} color={COLORS.romance} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setShowCurrencyPicker(false)} style={styles.currClose}>
+              <Text style={{ color: COLORS.text, fontWeight: "800" }}>done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -191,6 +268,18 @@ const styles = StyleSheet.create({
   sectionHeader: { color: COLORS.text, fontSize: 18, fontWeight: "900", letterSpacing: -0.3 },
   sectionNote: { color: COLORS.secondary, fontSize: 11, marginTop: -4 },
   packCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden" },
+  packsHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  currencyChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  currencyChipText: { color: COLORS.text, fontWeight: "800", fontSize: 12, letterSpacing: 0.5 },
+  currBackdrop: { flex: 1, backgroundColor: "rgba(10,10,15,0.85)", justifyContent: "flex-end" },
+  currSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: COLORS.border, paddingBottom: SPACING.lg },
+  currHandle: { alignSelf: "center", width: 40, height: 4, backgroundColor: COLORS.border, borderRadius: 999, marginTop: 8 },
+  currTitle: { color: COLORS.text, fontSize: 22, fontWeight: "900", paddingHorizontal: SPACING.lg, marginTop: SPACING.md, letterSpacing: -0.5 },
+  currSub: { color: COLORS.secondary, fontSize: 12, paddingHorizontal: SPACING.lg, marginTop: 4 },
+  currRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.elevated },
+  currCode: { color: COLORS.text, fontWeight: "800", fontSize: 14, letterSpacing: 0.5 },
+  currLabel: { color: COLORS.secondary, fontSize: 12, marginTop: 2 },
+  currClose: { alignSelf: "center", paddingHorizontal: 24, paddingVertical: 12, marginTop: SPACING.sm, borderRadius: RADIUS.pill, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.border },
   packIcon: { width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: "center", justifyContent: "center" },
   packLabel: { color: COLORS.text, fontWeight: "800" },
   packGems: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
