@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { storyApi } from "@/src/api";
+import { storyApi, analyticsApi } from "@/src/api";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
 
 export default function EndingScreen() {
@@ -31,9 +31,22 @@ export default function EndingScreen() {
   const share = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await Share.share({
+      const result = await Share.share({
         message: `i just got the ${rarityLabel(rarity).toLowerCase()} ending in ${story.title}. ${VOICE.endingRareTemplate(rarity)}. #Delulu #deluluIsTheSolulu`,
       });
+      // Analytics: fire share_card_shared once the native sheet has been engaged
+      // (either shared with an activity or dismissed). Both count as user intent.
+      if (result?.action === Share.sharedAction || result?.action === Share.dismissedAction) {
+        analyticsApi.track("share_card_shared", {
+          storyId: story.id,
+          endingId: ending.id,
+          surface: "reader_ending",
+          rarityPercent: rarity,
+          didShare: result.action === Share.sharedAction,
+          activityType: result.activityType || null,
+        });
+        storyApi.shareEnding({ storyId: story.id, endingId: ending.id, surface: "reader_ending" });
+      }
     } catch {}
   };
 

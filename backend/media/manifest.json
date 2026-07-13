@@ -37,5 +37,9 @@
     "preset_avatar_4": "preset_avatar_4.png",
     "preset_avatar_5": "preset_avatar_5.png",
     "preset_avatar_6": "preset_avatar_6.png"
+  },
+  "covers": {
+    "falling_for_the_enigma": "cover_flagship.png",
+    "burn_notice": "cover_burn_notice.png"
   }
 }

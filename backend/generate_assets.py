@@ -103,6 +103,17 @@ SCENES = {
         f"gazing intensely at the viewer, standing on a neon-lit rain-slicked rooftop bar at midnight. "
         f"City skyline glowing with pink and purple lights. Dramatic composition. Vertical portrait 3:4."
     ),
+    "cover_burn_notice": (
+        f"{STYLE} Book cover illustration for a spy-thriller titled BURN NOTICE. Male lead KARAN "
+        f"(late 20s, jet-black slicked-back hair, cool grey-blue eyes, fitted charcoal turtleneck) "
+        f"standing at the center in noir shadow, one side of his face lit by cold electric-blue (#3E9BFF) "
+        f"screen glow reflecting from a phone he holds low. Behind him a rain-streaked skyline of a "
+        f"neo-noir cityscape at 3AM, blurred red-and-blue emergency lights bleeding through mist. "
+        f"A single silhouetted female figure in the far background across a rooftop, back turned. "
+        f"Halftone smoke and rain streaks in the foreground. Cinematic thriller film-poster composition, "
+        f"tense and dangerous energy, dark contrast, muted teal-and-crimson palette with electric-blue "
+        f"neon accents. Vertical portrait 3:4."
+    ),
     "panel_rooftop": (
         f"{STYLE} Full-scene comic panel. Wide shot of a moody rooftop bar at 9pm, rain misting the neon "
         f"signs, string lights, wet floor reflecting hot-pink neon. A silhouetted male figure (Rian, "
@@ -207,17 +218,35 @@ async def gen_scenes(force=False):
 
 async def gen_cover(force=False):
     manifest = _load_manifest()
+    manifest.setdefault("covers", {})
+    # Flagship (romance) cover
     filename = "cover_flagship.png"
     out = MEDIA_DIR / filename
     if out.exists() and not force:
         manifest["cover"] = filename
+        manifest["covers"]["falling_for_the_enigma"] = filename
         print(f"  = skip (exists) {filename}")
     else:
         print(f"→ generating {filename} …")
         ok = await _gen_one(prompt=SCENES["cover"], out_path=out)
         if ok:
             manifest["cover"] = filename
+            manifest["covers"]["falling_for_the_enigma"] = filename
             print(f"  ✓ saved {filename}")
+    _save_manifest(manifest)
+
+    # Burn Notice (thriller) cover
+    filename2 = "cover_burn_notice.png"
+    out2 = MEDIA_DIR / filename2
+    if out2.exists() and not force:
+        manifest["covers"]["burn_notice"] = filename2
+        print(f"  = skip (exists) {filename2}")
+    else:
+        print(f"→ generating {filename2} …")
+        ok2 = await _gen_one(prompt=SCENES["cover_burn_notice"], out_path=out2)
+        if ok2:
+            manifest["covers"]["burn_notice"] = filename2
+            print(f"  ✓ saved {filename2}")
     _save_manifest(manifest)
 
 

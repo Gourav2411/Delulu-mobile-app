@@ -79,6 +79,7 @@ export const storyApi = {
   unlockChapter: (payload) => api.post("/chapters/unlock", payload),
   skipTimer: (payload) => api.post("/chapters/skip-timer", payload),
   recordEnding: (payload) => api.post("/endings/record", payload),
+  shareEnding: (payload) => api.post("/endings/share", payload).catch(() => ({})),
 };
 
 export const avatarApi = {

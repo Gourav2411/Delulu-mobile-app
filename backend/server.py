@@ -249,6 +249,8 @@ def _default_user_doc(user_id: str, email: str, display_name: str, provider: str
         "lastDailyClaim": None,
         # Reading
         "ownedEndings": [],
+        "endingUnlockTimes": {},  # {"storyId:endingId": iso timestamp}
+        "endingShareCounts": {},  # {"storyId:endingId": int}
         "genrePreferences": [],
         "progress": {},  # storyId -> {chapterIndex, messageIndex, choicesMade, unlockedAt}
         # Avatar
@@ -537,9 +539,16 @@ async def complete_chapter(body: CompleteChapterIn, user = Depends(get_user_from
 async def record_ending(body: RecordEndingIn, user = Depends(get_user_from_token)):
     key = f"{body.storyId}:{body.endingId}"
     owned = user.get("ownedEndings", [])
+    unlock_times = user.get("endingUnlockTimes", {}) or {}
+    now_iso = utcnow().isoformat()
     if key not in owned:
         owned.append(key)
-    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"ownedEndings": owned}})
+    # Always refresh unlock time on latest completion (also patches legacy users)
+    unlock_times[key] = now_iso
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"ownedEndings": owned, "endingUnlockTimes": unlock_times}},
+    )
     await db.ending_completions.insert_one({
         "storyId": body.storyId,
         "endingId": body.endingId,
@@ -552,7 +561,40 @@ async def record_ending(body: RecordEndingIn, user = Depends(get_user_from_token
     if story:
         ending = next((e for e in story["endings"] if e["id"] == body.endingId), None)
         rarity = int(ending.get("rarityPercent", 0)) if ending else 0
-    return {"ok": True, "ownedEndings": owned, "rarityPercent": rarity}
+    return {"ok": True, "ownedEndings": owned, "endingUnlockTimes": unlock_times, "rarityPercent": rarity}
+
+
+class ShareEndingIn(BaseModel):
+    storyId: str
+    endingId: str
+    surface: Optional[str] = "ending_wall"  # ending_wall | reader_ending | share_card
+
+
+@api.post("/endings/share")
+async def share_ending(body: ShareEndingIn, request: Request, user = Depends(get_user_from_token)):
+    """Fires when a user successfully opens the native share sheet for an ending card.
+    Increments per-ending share count on the user and logs a `share_card_shared` analytics event."""
+    key = f"{body.storyId}:{body.endingId}"
+    counts = user.get("endingShareCounts", {}) or {}
+    counts[key] = int(counts.get(key, 0)) + 1
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"endingShareCounts": counts}},
+    )
+    await db.analytics_events.insert_one({
+        "id": make_id("ev_"),
+        "event": "share_card_shared",
+        "props": {
+            "storyId": body.storyId,
+            "endingId": body.endingId,
+            "surface": body.surface,
+            "shareCount": counts[key],
+        },
+        "user_id": user["user_id"],
+        "at": utcnow(),
+        "ip": request.client.host if request.client else None,
+    })
+    return {"ok": True, "endingShareCounts": counts, "shareCount": counts[key]}
 
 
 # ============================================================================

@@ -126,6 +126,18 @@ SCENE_PANEL_ENDING = (_MANIFEST and _media_url(_MANIFEST.get("scenes", {}).get("
     "https://images.unsplash.com/photo-1502224562085-639556652f33?w=1200&q=80"
 
 
+def _cover_for(story_id, fallback):
+    """Look up a per-story cover from the manifest.covers map, else fall back."""
+    if _MANIFEST:
+        covers = _MANIFEST.get("covers") or {}
+        fn = covers.get(story_id)
+        if fn:
+            url = _media_url(fn)
+            if url:
+                return url
+    return fallback
+
+
 def m(mid, sender, text, delay=1400, expression="neutral", size="small", react=None, sfx=None, panel=None, choice=None):
     return {
         "id": mid,
@@ -409,7 +421,7 @@ def build_story_burn_notice():
         "title": "Burn Notice",
         "genre": "thriller",
         "accentColor": "#3E9BFF",
-        "coverUrl": "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1000&q=80",
+        "coverUrl": _cover_for("burn_notice", "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1000&q=80"),
         "synopsis": "One transmission. One rooftop. One person who's been watching. You have four minutes to decide who to trust.",
         "tropeTags": ["Spy Thriller", "Enemies to Lovers", "One Night"],
         "characters": characters,
@@ -419,6 +431,82 @@ def build_story_burn_notice():
         "isFlagship": True,
         "ageRating": "16+",
         "totalReads": 12480,
+    }
+
+
+# ============================================================================
+# CATALOG (delulu_catalog.json) — additive merge
+# Loads all 30 canonical stories from the master catalog and seeds them alongside
+# the two flagship stories built in this file. Existing story IDs are skipped so
+# our hand-authored `falling_for_the_enigma` / `burn_notice` remain the source
+# of truth for those slugs.
+# ============================================================================
+
+CATALOG_PATH = Path(__file__).parent.parent / "memory" / "artifacts" / "delulu_catalog.json"
+# IDs that are already fully authored in this file — skip catalog copy for these
+_LOCAL_STORY_IDS = {"falling_for_the_enigma", "burn_notice"}
+
+# Genre-appropriate unsplash placeholders for catalog stories without generated art
+_GENRE_COVER_FALLBACK = {
+    "romance":  "https://images.unsplash.com/photo-1495995700630-cc9432fbfe37?w=1000&q=80",
+    "thriller": "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1000&q=80",
+    "horror":   "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=1000&q=80",
+    "scifi":    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1000&q=80",
+    "drama":    "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1000&q=80",
+}
+
+
+def _load_catalog():
+    if not CATALOG_PATH.exists():
+        return None
+    try:
+        return json.loads(CATALOG_PATH.read_text())
+    except Exception:
+        return None
+
+
+def _normalize_catalog_story(cat):
+    """Convert a catalog story blob into the shape stored in db.stories.
+    Catalog stories carry rich metadata (bio, tropes, chapter outlines) but only
+    s01 ships with a real chapter. Everything else remains status='coming_soon'
+    until its chapters[] array is populated by the generation pipeline.
+    """
+    genre = (cat.get("genre") or "drama").lower()
+    fallback_cover = _GENRE_COVER_FALLBACK.get(genre, _GENRE_COVER_FALLBACK["drama"])
+    # Use manifest cover if available (per-story key), else genre fallback
+    cover_url = _cover_for(cat["id"], fallback_cover)
+    # If chapters have at least 3 real, playable chapters (matches the free-chapter
+    # window) the story goes live; otherwise it stays coming_soon so counters like
+    # "1/6 endings unlocked" stay bounded to stories the user can actually finish.
+    has_playable_content = len(cat.get("chapters") or []) >= 3
+    status = "live" if has_playable_content else "coming_soon"
+    # Normalize character portrait paths (catalog uses placeholder paths that
+    # aren't served — swap in generic silhouette fallbacks for the reader UI).
+    characters = []
+    _generic_portrait = "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=500&q=80"
+    for c in cat.get("characters", []):
+        characters.append({
+            **c,
+            "avatarUrl": c.get("avatarUrl") if str(c.get("avatarUrl", "")).startswith("http") else _generic_portrait,
+            "portraitUrls": {k: (v if str(v).startswith("http") else _generic_portrait)
+                             for k, v in (c.get("portraitUrls") or {}).items()},
+        })
+    return {
+        "id": cat["id"],
+        "title": cat.get("title", cat["id"]),
+        "genre": genre,
+        "accentColor": cat.get("accentColor", "#FF3E8A"),
+        "coverUrl": cover_url,
+        "synopsis": cat.get("synopsis", ""),
+        "tropeTags": cat.get("tropeTags", []),
+        "characters": characters,
+        "chapters": cat.get("chapters", []),
+        "chapterOutline": cat.get("chapterOutline", []),
+        "endings": cat.get("endings", []),
+        "status": status,
+        "isFlagship": bool(cat.get("isFlagship", False)),
+        "ageRating": cat.get("ageRating", "16+"),
+        "totalReads": int(cat.get("totalReads", 0)),
     }
 
 
@@ -439,29 +527,50 @@ async def seed_all(db):
     burn = build_story_burn_notice()
     await db.stories.update_one({"id": burn["id"]}, {"$set": burn}, upsert=True)
 
-    # A couple of coming-soon stubs so the home page has genre variety
-    coming_soon = [
-        {
+    # Additive catalog merge — pull in every canonical story from delulu_catalog.json
+    # that isn't already fully authored above.
+    catalog = _load_catalog()
+    if catalog and isinstance(catalog.get("stories"), list):
+        for cat_story in catalog["stories"]:
+            sid = cat_story.get("id")
+            if not sid or sid in _LOCAL_STORY_IDS:
+                continue
+            normalized = _normalize_catalog_story(cat_story)
+            # Preserve any hand-authored fields already in the db (e.g. reads)
+            await db.stories.update_one(
+                {"id": sid},
+                {"$set": normalized},
+                upsert=True,
+            )
+        print(f"[seed] catalog merged: {len(catalog['stories'])} stories (skipped {len(_LOCAL_STORY_IDS)} local)")
+
+    # Legacy coming-soon stubs — kept only if the catalog didn't already replace them
+    coming_soon_ids = {"the_last_signal", "midnight_house", "understudy"}
+    existing = {doc["id"] async for doc in db.stories.find({"id": {"$in": list(coming_soon_ids)}}, {"id": 1})}
+    coming_soon = []
+    if "the_last_signal" not in existing:
+        coming_soon.append({
             "id": "the_last_signal", "title": "The Last Signal", "genre": "scifi", "accentColor": "#7C5CFF",
             "coverUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1000&q=80",
             "synopsis": "One transmission. Twelve survivors. And a voice that knows your name.",
             "tropeTags": ["Space Horror", "Slow Burn"], "characters": [], "chapters": [], "endings": [],
             "status": "coming_soon", "isFlagship": False, "totalReads": 0,
-        },
-        {
+        })
+    if "midnight_house" not in existing:
+        coming_soon.append({
             "id": "midnight_house", "title": "The House on Midnight Row", "genre": "horror", "accentColor": "#E5273E",
             "coverUrl": "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=1000&q=80",
             "synopsis": "Every mirror in the house lies. Except one.",
             "tropeTags": ["Haunted", "Mystery"], "characters": [], "chapters": [], "endings": [],
             "status": "coming_soon", "isFlagship": False, "totalReads": 0,
-        },
-        {
+        })
+    if "understudy" not in existing:
+        coming_soon.append({
             "id": "understudy", "title": "Understudy", "genre": "drama", "accentColor": "#FF8A3E",
             "coverUrl": "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1000&q=80",
             "synopsis": "The lead can't perform tonight. And you know exactly why.",
             "tropeTags": ["Fame", "Rivalry"], "characters": [], "chapters": [], "endings": [],
             "status": "coming_soon", "isFlagship": False, "totalReads": 0,
-        },
-    ]
+        })
     for s in coming_soon:
         await db.stories.update_one({"id": s["id"]}, {"$set": s}, upsert=True)

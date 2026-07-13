@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import Svg, { Circle } from "react-native-svg";
 import { AvatarPreview } from "@/src/AvatarPreview";
 import { avatarApi, storyApi } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
@@ -48,6 +49,12 @@ export default function Profile() {
       return story && ending ? { storyId, endingId, name: ending.name, rarity: ending.rarityPercent, cover: story.coverUrl } : null;
     }).filter(Boolean);
   }, [user, stories]);
+
+  // Total endings collectible across live stories only (matches Ending Wall)
+  const totalEndings = useMemo(
+    () => stories.filter((s) => s.status === "live").reduce((n, s) => n + (s.endings?.length || 0), 0),
+    [stories]
+  );
 
   if (loading) return <View style={styles.loading}><ActivityIndicator color={COLORS.romance} /></View>;
 
@@ -150,7 +157,7 @@ export default function Profile() {
           >
             <Ionicons name="ribbon" size={18} color={COLORS.gemGold} />
             <Text style={styles.rowText}>ending wall</Text>
-            <Text style={{ color: COLORS.gemGold, fontWeight: "800", fontSize: 12, marginRight: 4 }}>{endings.length}</Text>
+            <EndingProgressRing collected={endings.length} total={totalEndings || endings.length || 1} />
             <Ionicons name="chevron-forward" size={16} color={COLORS.secondary} />
           </TouchableOpacity>
           <RowItem icon="trophy" label="achievements" />
@@ -196,6 +203,39 @@ function rarityColor(pct) {
   if (pct <= 5) return COLORS.gemGold;
   if (pct <= 20) return COLORS.scifi;
   return COLORS.success;
+}
+
+// Compact circular progress ring shown next to the "ending wall" row.
+// Displays the collected count over the total endings across all live stories.
+function EndingProgressRing({ collected, total }) {
+  const size = 34;
+  const stroke = 3;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const progress = total ? Math.max(0, Math.min(1, collected / total)) : 0;
+  const offset = c * (1 - progress);
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center", marginRight: 6 }}>
+      <Svg width={size} height={size} style={{ position: "absolute" }}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.15)" strokeWidth={stroke} fill="transparent" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={COLORS.gemGold}
+          strokeWidth={stroke}
+          fill="transparent"
+          strokeDasharray={`${c} ${c}`}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <Text style={{ color: COLORS.gemGold, fontSize: 9, fontWeight: "900" }} testID="profile-ending-ring">
+        {collected}/{total}
+      </Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
