@@ -235,7 +235,7 @@ export default function Reader() {
             <Image source={{ uri: panel.imageUrl }} style={StyleSheet.absoluteFillObject} />
             <LinearGradient colors={[`${accent}55`, "transparent", "rgba(10,10,15,0.7)"]} style={StyleSheet.absoluteFill} />
             <View style={styles.halftoneBurst} />
-            <View style={[styles.panelBorder, { borderColor: accent }]} pointerEvents="none" />
+            <View style={[styles.panelBorder, { borderColor: accent, pointerEvents: "none" }]} />
             {panel.caption && (
               <View style={styles.panelCaption}>
                 <Text style={styles.panelCaptionText}>{panel.caption.toUpperCase()}</Text>

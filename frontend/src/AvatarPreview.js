@@ -10,7 +10,7 @@ import { COLORS } from "@/src/theme";
 function Layer({ slot, color, expression = "neutral" }) {
   if (slot === "body") {
     return (
-      <View style={[styles.abs, { alignItems: "center", justifyContent: "flex-end" }]} pointerEvents="none">
+      <View style={[styles.abs, { alignItems: "center", justifyContent: "flex-end", pointerEvents: "none" }]}>
         {/* shoulders */}
         <View style={{ width: "76%", height: "40%", borderTopLeftRadius: 120, borderTopRightRadius: 120, backgroundColor: color }} />
       </View>
@@ -18,7 +18,7 @@ function Layer({ slot, color, expression = "neutral" }) {
   }
   if (slot === "head") {
     return (
-      <View style={[styles.abs, { alignItems: "center" }]} pointerEvents="none">
+      <View style={[styles.abs, { alignItems: "center", pointerEvents: "none" }]}>
         <View style={{ marginTop: "12%", width: "48%", aspectRatio: 0.82, borderRadius: 999, backgroundColor: color }} />
       </View>
     );
@@ -28,7 +28,7 @@ function Layer({ slot, color, expression = "neutral" }) {
     const isShocked = expression === "shocked";
     const isHappy = expression === "happy";
     return (
-      <View style={[styles.abs, { alignItems: "center" }]} pointerEvents="none">
+      <View style={[styles.abs, { alignItems: "center", pointerEvents: "none" }]}>
         <View style={{ marginTop: "34%", flexDirection: "row", gap: 22 }}>
           <View style={{ width: isShocked ? 12 : 10, height: isHappy ? 4 : (isShocked ? 12 : 10), borderRadius: 8, backgroundColor: color }} />
           <View style={{ width: isShocked ? 12 : 10, height: isHappy ? 4 : (isShocked ? 12 : 10), borderRadius: 8, backgroundColor: color }} />
@@ -38,14 +38,14 @@ function Layer({ slot, color, expression = "neutral" }) {
   }
   if (slot === "mouth") {
     return (
-      <View style={[styles.abs, { alignItems: "center" }]} pointerEvents="none">
+      <View style={[styles.abs, { alignItems: "center", pointerEvents: "none" }]}>
         <View style={{ marginTop: "44%", width: 22, height: 3, borderRadius: 2, backgroundColor: color }} />
       </View>
     );
   }
   if (slot === "hair") {
     return (
-      <View style={[styles.abs, { alignItems: "center" }]} pointerEvents="none">
+      <View style={[styles.abs, { alignItems: "center", pointerEvents: "none" }]}>
         {/* hair cap over head */}
         <View style={{ marginTop: "10%", width: "56%", aspectRatio: 1.3, borderTopLeftRadius: 999, borderTopRightRadius: 999, backgroundColor: color, opacity: 0.98 }} />
         {/* fringe */}
@@ -55,7 +55,7 @@ function Layer({ slot, color, expression = "neutral" }) {
   }
   if (slot === "outfit") {
     return (
-      <View style={[styles.abs, { alignItems: "center", justifyContent: "flex-end" }]} pointerEvents="none">
+      <View style={[styles.abs, { alignItems: "center", justifyContent: "flex-end", pointerEvents: "none" }]}>
         <View style={{ width: "72%", height: "32%", borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: color }} />
         {/* collar accent */}
         <View style={{ position: "absolute", bottom: "28%", width: 14, height: 14, borderRadius: 3, backgroundColor: COLORS.text, opacity: 0.15, transform: [{ rotate: "45deg" }] }} />
@@ -64,7 +64,7 @@ function Layer({ slot, color, expression = "neutral" }) {
   }
   if (slot === "accessory") {
     return (
-      <View style={[styles.abs, { alignItems: "center" }]} pointerEvents="none">
+      <View style={[styles.abs, { alignItems: "center", pointerEvents: "none" }]}>
         {/* chain / glasses shown as a bar */}
         <View style={{ marginTop: "38%", width: 46, height: 4, borderRadius: 2, backgroundColor: color }} />
       </View>
@@ -98,7 +98,6 @@ export function AvatarPreview({ layers, catalog, expression = "neutral", size = 
     <View style={{ width: size, aspectRatio: 0.82, backgroundColor: bg }} testID="avatar-preview">
       {showHalo && (
         <View
-          pointerEvents="none"
           style={{
             position: "absolute",
             top: "18%",
@@ -109,6 +108,7 @@ export function AvatarPreview({ layers, catalog, expression = "neutral", size = 
             backgroundColor: COLORS.romance,
             opacity: 0.18,
             transform: [{ scale: 1.2 }],
+            pointerEvents: "none",
           }}
         />
       )}
