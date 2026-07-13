@@ -140,22 +140,30 @@ export default function StoryDetail() {
                   testID={`chapter-${i}`}
                   activeOpacity={0.85}
                   disabled={locked}
-                  style={[styles.chapRow, locked && { opacity: 0.5 }]}
+                  style={[styles.chapRow, locked && { opacity: 0.5 }, current && { borderLeftWidth: 3, borderLeftColor: accent, paddingLeft: 12 }]}
                   onPress={() => {
                     Haptics.selectionAsync();
                     router.push(`/reader/${story.id}?chapter=${i}`);
                   }}
                 >
-                  <View style={styles.chapNum}>
-                    <Text style={styles.chapNumText}>Ch. {i + 1}</Text>
+                  <View style={[styles.chapNum, done && { backgroundColor: `${COLORS.success}22` }, current && { backgroundColor: `${accent}22` }]}>
+                    <Text style={[styles.chapNumText, done && { color: COLORS.success }, current && { color: accent }]}>{String(i + 1).padStart(2, "0")}</Text>
                   </View>
-                  <Text style={styles.chapTitle} numberOfLines={1}>{ch.title}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.chapTitle} numberOfLines={1}>{ch.title}</Text>
+                    <Text style={styles.chapBadge}>
+                      {done ? "COMPLETED" : current ? "IN PROGRESS" : isFree ? "FREE" : locked ? "LOCKED" : ""}
+                    </Text>
+                  </View>
                   {done ? (
-                    <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+                    <Ionicons name="checkmark-circle" size={22} color={COLORS.success} />
                   ) : locked ? (
-                    <Ionicons name="lock-closed" size={16} color={COLORS.secondary} />
+                    <View style={styles.chapLockPill}>
+                      <View style={styles.chapGem} />
+                      <Text style={styles.chapLockText}>15</Text>
+                    </View>
                   ) : (
-                    <Ionicons name="chevron-forward" size={20} color={accent} />
+                    <Ionicons name="chevron-forward" size={22} color={accent} />
                   )}
                 </TouchableOpacity>
               );
@@ -214,10 +222,14 @@ const styles = StyleSheet.create({
   charRole: { color: COLORS.secondary, fontSize: 10 },
   chapHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
   chapMeta: { color: COLORS.secondary, fontSize: 12 },
-  chapRow: { flexDirection: "row", alignItems: "center", gap: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  chapNum: { minWidth: 52, borderRadius: RADIUS.sm, backgroundColor: COLORS.elevated, paddingHorizontal: 8, paddingVertical: 4, alignItems: "center" },
-  chapNumText: { color: COLORS.secondary, fontSize: 11, fontWeight: "700" },
-  chapTitle: { flex: 1, color: COLORS.text, fontSize: 15, fontWeight: "600" },
+  chapRow: { flexDirection: "row", alignItems: "center", gap: SPACING.md, paddingVertical: 14, paddingHorizontal: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginBottom: 6 },
+  chapNum: { width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.elevated, alignItems: "center", justifyContent: "center" },
+  chapNumText: { color: COLORS.secondary, fontSize: 13, fontWeight: "900", letterSpacing: 0.5 },
+  chapTitle: { color: COLORS.text, fontSize: 15, fontWeight: "700", letterSpacing: -0.2 },
+  chapBadge: { color: COLORS.secondary, fontSize: 9, fontWeight: "900", letterSpacing: 1, marginTop: 2 },
+  chapLockPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: "rgba(255,201,74,0.15)", borderWidth: 1, borderColor: COLORS.gemGold },
+  chapGem: { width: 8, height: 8, backgroundColor: COLORS.gemGold, transform: [{ rotate: "45deg" }] },
+  chapLockText: { color: COLORS.gemGold, fontWeight: "900", fontSize: 12, fontVariant: ["tabular-nums"] },
   stickyCtaWrap: { position: "absolute", left: 0, right: 0, bottom: 0, padding: SPACING.md, paddingBottom: SPACING.lg, backgroundColor: "rgba(10,10,15,0.9)", borderTopWidth: 1, borderTopColor: COLORS.border },
   startBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 16, borderRadius: RADIUS.pill },
   startBtnText: { color: COLORS.bg, fontWeight: "800", fontSize: 16 },

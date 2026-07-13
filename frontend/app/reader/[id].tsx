@@ -188,6 +188,19 @@ export default function Reader() {
 
   return (
     <View style={styles.root}>
+      {/* Cinematic backdrop — the story cover blurred behind everything */}
+      {story?.coverUrl && (
+        <>
+          <Image source={{ uri: story.coverUrl }} style={styles.backdrop} blurRadius={30} />
+          <View style={styles.backdropTint} />
+          <LinearGradient
+            colors={[`${accent}22`, "transparent", "rgba(10,10,15,0.65)"]}
+            locations={[0, 0.35, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+        </>
+      )}
+
       {/* Top edge exit + chapter title */}
       <SafeAreaView edges={["top"]}>
         <View style={styles.topBar}>
@@ -431,9 +444,11 @@ function pickEndingId(story, user) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
+  backdrop: { ...StyleSheet.absoluteFillObject, opacity: 0.35 },
+  backdropTint: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(10,10,15,0.82)" },
   loading: { flex: 1, backgroundColor: COLORS.bg, alignItems: "center", justifyContent: "center", gap: 8 },
   loadingText: { color: COLORS.secondary },
-  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: SPACING.md, paddingVertical: 6, backgroundColor: COLORS.bg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: SPACING.md, paddingVertical: 8, backgroundColor: "rgba(10,10,15,0.6)", borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
   exitBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 999 },
   chapTitle: { flex: 1, color: COLORS.text, fontSize: 13, fontWeight: "700", textAlign: "center" },
   progressBar: { height: 2, backgroundColor: COLORS.elevated },
@@ -464,14 +479,14 @@ const styles = StyleSheet.create({
 
   // Choice moment
   choiceOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
-  choiceCharWrap: { position: "absolute", left: 0, right: 0, top: 60, bottom: 260, opacity: 0.9 },
-  choiceCharImg: { ...StyleSheet.absoluteFillObject, resizeMode: "cover", opacity: 0.85 },
-  choicePanel: { padding: SPACING.lg, gap: SPACING.sm, paddingBottom: SPACING.xl },
-  choicePrompt: { color: COLORS.text, fontSize: 18, fontWeight: "800", letterSpacing: -0.3, textAlign: "center", marginBottom: SPACING.sm },
-  choiceCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.glass },
-  choiceCardPremium: { borderColor: COLORS.gemGold, backgroundColor: "rgba(255,201,74,0.08)" },
-  choiceText: { color: COLORS.text, fontSize: 16, fontWeight: "700" },
-  choicePremiumHelper: { color: COLORS.secondary, fontSize: 11, marginTop: 2 },
+  choiceCharWrap: { position: "absolute", left: 0, right: 0, top: 40, bottom: 300, opacity: 0.95 },
+  choiceCharImg: { ...StyleSheet.absoluteFillObject, resizeMode: "cover", opacity: 0.9 },
+  choicePanel: { padding: SPACING.lg, gap: 10, paddingBottom: SPACING.xl },
+  choicePrompt: { color: COLORS.text, fontSize: 20, fontWeight: "900", letterSpacing: -0.5, textAlign: "center", marginBottom: SPACING.sm, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 12 },
+  choiceCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: 14, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.15)", backgroundColor: "rgba(22,22,31,0.85)" },
+  choiceCardPremium: { borderColor: COLORS.gemGold, borderWidth: 2, backgroundColor: "rgba(255,201,74,0.12)", shadowColor: COLORS.gemGold, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10 },
+  choiceText: { color: COLORS.text, fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
+  choicePremiumHelper: { color: COLORS.gemGold, fontSize: 11, marginTop: 3, fontWeight: "700" },
   freeText: { color: COLORS.secondary, fontSize: 12, fontWeight: "700" },
   gemPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: "rgba(255,201,74,0.15)", borderWidth: 1, borderColor: COLORS.gemGold },
   gemDotSm: { width: 8, height: 8, backgroundColor: COLORS.gemGold, transform: [{ rotate: "45deg" }] },

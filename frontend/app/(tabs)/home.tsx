@@ -82,36 +82,48 @@ export default function Home() {
         contentContainerStyle={{ paddingBottom: SPACING.xxl }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.romance} />}
       >
-        {/* Flagship hero */}
+        {/* Flagship hero — cinematic full-bleed */}
         {flagship && (
           <TouchableOpacity
             testID="home-flagship-hero"
-            activeOpacity={0.9}
+            activeOpacity={0.92}
             onPress={() => router.push(`/story/${flagship.id}`)}
             style={styles.hero}
           >
             <Image source={{ uri: flagship.coverUrl }} style={styles.heroImg} />
             <LinearGradient
-              colors={["transparent", "rgba(10,10,15,0.75)", "#0A0A0F"]}
-              locations={[0, 0.6, 1]}
+              colors={["transparent", "rgba(10,10,15,0.55)", "#0A0A0F"]}
+              locations={[0, 0.55, 1]}
               style={StyleSheet.absoluteFill}
             />
             <LinearGradient
-              colors={[`${flagship.accentColor}55`, "transparent"]}
-              start={{ x: 0, y: 0 }}
+              colors={[`${flagship.accentColor}66`, "transparent"]}
+              start={{ x: 0.1, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.heroContent}>
-              <View style={[styles.newBadge, { borderColor: flagship.accentColor }]}>
-                <Text style={[styles.newBadgeText, { color: flagship.accentColor }]}>NEW · FLAGSHIP</Text>
+              <View style={styles.badgeRow}>
+                <View style={[styles.pillBadge, { backgroundColor: flagship.accentColor }]}>
+                  <Ionicons name="flame" size={11} color={COLORS.bg} />
+                  <Text style={styles.pillBadgeText}>FLAGSHIP</Text>
+                </View>
+                <View style={styles.pillBadgeOutline}>
+                  <Text style={styles.pillBadgeOutlineText}>{flagship.ageRating || "16+"}</Text>
+                </View>
+                <View style={styles.pillBadgeOutline}>
+                  <Text style={styles.pillBadgeOutlineText}>{formatReads(flagship.totalReads)} reads</Text>
+                </View>
               </View>
-              <Text style={styles.heroTitle}>{flagship.title.toUpperCase()}</Text>
-              <Text style={styles.heroSub}>{flagship.synopsis?.split(".")[0]}.</Text>
+              <Text style={styles.heroTitle}>{flagship.title}</Text>
+              <Text style={styles.heroSub} numberOfLines={2}>{flagship.synopsis}</Text>
               <View style={styles.heroCtaRow}>
                 <View style={[styles.heroCta, { backgroundColor: flagship.accentColor }]}>
-                  <Ionicons name="book" size={14} color={COLORS.bg} />
+                  <Ionicons name="play" size={14} color={COLORS.bg} />
                   <Text style={styles.heroCtaText}>start reading</Text>
+                </View>
+                <View style={styles.heroSecCta}>
+                  <Ionicons name="bookmark-outline" size={16} color={COLORS.text} />
                 </View>
               </View>
             </View>
@@ -138,12 +150,18 @@ export default function Home() {
                     onPress={() => router.push(`/story/${story.id}`)}
                   >
                     <Image source={{ uri: story.coverUrl }} style={styles.contCover} />
+                    <LinearGradient colors={["transparent", "rgba(10,10,15,0.55)"]} style={StyleSheet.absoluteFillObject} />
                     <View style={{ flex: 1, padding: SPACING.sm, justifyContent: "space-between" }}>
-                      <Text numberOfLines={1} style={styles.contTitle}>{story.title}</Text>
-                      <Text style={styles.contChapter}>Ch. {chapterIndex + 1} · {pct}%</Text>
+                      <View>
+                        <Text numberOfLines={1} style={styles.contTitle}>{story.title}</Text>
+                        <Text style={styles.contChapter}>Ch. {chapterIndex + 1} of {total} · {pct}%</Text>
+                      </View>
                       <View style={styles.progressBar}>
                         <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: story.accentColor }]} />
                       </View>
+                    </View>
+                    <View style={[styles.contPlayBtn, { backgroundColor: story.accentColor }]}>
+                      <Ionicons name="play" size={14} color={COLORS.bg} />
                     </View>
                   </TouchableOpacity>
                 );
@@ -182,16 +200,28 @@ export default function Home() {
                   style={styles.storyCard}
                 >
                   <Image source={{ uri: s.coverUrl }} style={styles.storyCover} />
-                  <LinearGradient colors={["transparent", "rgba(10,10,15,0.92)"]} style={styles.cardShade} />
+                  <LinearGradient colors={["transparent", "rgba(10,10,15,0.35)", "rgba(10,10,15,0.95)"]} locations={[0, 0.55, 1]} style={styles.cardShade} />
+                  <LinearGradient colors={[`${s.accentColor}44`, "transparent"]} start={{x:0,y:0}} end={{x:1,y:0}} style={StyleSheet.absoluteFill} />
                   <View style={styles.cardText}>
                     <Text numberOfLines={2} style={styles.cardTitle}>{s.title}</Text>
-                    <View style={[styles.genreTag, { backgroundColor: s.accentColor }]}>
-                      <Text style={styles.genreTagText}>{cap(s.genre)}</Text>
+                    <View style={styles.cardMetaRow}>
+                      <View style={[styles.genreTag, { backgroundColor: s.accentColor }]}>
+                        <Text style={styles.genreTagText}>{cap(s.genre)}</Text>
+                      </View>
+                      <View style={styles.cardMetaChip}>
+                        <Ionicons name="book" size={9} color={COLORS.text} />
+                        <Text style={styles.cardMetaText}>{s.chapters?.length || 0}</Text>
+                      </View>
                     </View>
                   </View>
                   {s.status === "coming_soon" && (
                     <View style={styles.soonRibbon}>
                       <Text style={styles.soonText}>SOON</Text>
+                    </View>
+                  )}
+                  {s.isFlagship && (
+                    <View style={styles.flameCorner}>
+                      <Ionicons name="flame" size={12} color={COLORS.gemGold} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -208,6 +238,12 @@ function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
 function genreIcon(g) {
   return { romance: "heart", thriller: "flash", horror: "flame", scifi: "planet", drama: "cafe" }[g] || "star";
 }
+function formatReads(n) {
+  if (!n) return "0";
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return `${n}`;
+}
 
 const styles = StyleSheet.create({
   loading: { flex: 1, backgroundColor: COLORS.bg, alignItems: "center", justifyContent: "center", gap: 12 },
@@ -220,37 +256,46 @@ const styles = StyleSheet.create({
   gemNum: { color: COLORS.gemGold, fontWeight: "800", fontVariant: ["tabular-nums"] },
   streakChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill },
   streakText: { color: COLORS.text, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  hero: { marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, overflow: "hidden", height: 320, marginTop: SPACING.md, borderWidth: 1, borderColor: COLORS.border },
+  hero: { marginHorizontal: SPACING.lg, borderRadius: RADIUS.xl, overflow: "hidden", height: 380, marginTop: SPACING.md, borderWidth: 1, borderColor: COLORS.border, shadowColor: COLORS.romance, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 24, elevation: 12 },
   heroImg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
-  heroContent: { position: "absolute", left: 0, right: 0, bottom: 0, padding: SPACING.lg, gap: 8 },
-  newBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderRadius: RADIUS.sm },
-  newBadgeText: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  heroTitle: { color: COLORS.text, fontSize: 30, fontWeight: "900", letterSpacing: -1, lineHeight: 32 },
-  heroSub: { color: COLORS.secondary, fontSize: 13 },
-  heroCtaRow: { flexDirection: "row", marginTop: 6 },
-  heroCta: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.pill },
-  heroCtaText: { color: COLORS.bg, fontWeight: "800", fontSize: 13 },
+  heroContent: { position: "absolute", left: 0, right: 0, bottom: 0, padding: SPACING.lg, gap: 10 },
+  badgeRow: { flexDirection: "row", gap: 6, marginBottom: 2 },
+  pillBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill },
+  pillBadgeText: { color: COLORS.bg, fontSize: 10, fontWeight: "900", letterSpacing: 0.6 },
+  pillBadgeOutline: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, backgroundColor: "rgba(10,10,15,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
+  pillBadgeOutlineText: { color: COLORS.text, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
+  heroTitle: { color: COLORS.text, fontSize: 34, fontWeight: "900", letterSpacing: -1.2, lineHeight: 36 },
+  heroSub: { color: COLORS.secondary, fontSize: 13, lineHeight: 18 },
+  heroCtaRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8 },
+  heroCta: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.pill },
+  heroCtaText: { color: COLORS.bg, fontWeight: "900", fontSize: 14 },
+  heroSecCta: { width: 44, height: 44, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.22)", backgroundColor: "rgba(10,10,15,0.55)", alignItems: "center", justifyContent: "center" },
   section: { marginTop: SPACING.xl, paddingHorizontal: SPACING.lg },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: SPACING.md },
-  sectionTitle: { color: COLORS.text, fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
+  sectionTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
   sectionLink: { color: COLORS.secondary, fontSize: 12 },
   rail: { gap: SPACING.md, paddingRight: SPACING.lg },
-  contCard: { width: 260, height: 88, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden", flexDirection: "row" },
-  contCover: { width: 88, height: 88 },
+  contCard: { width: 280, height: 96, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden", flexDirection: "row", position: "relative" },
+  contCover: { width: 96, height: 96 },
   contTitle: { color: COLORS.text, fontWeight: "800", fontSize: 14 },
-  contChapter: { color: COLORS.secondary, fontSize: 11 },
+  contChapter: { color: COLORS.secondary, fontSize: 11, marginTop: 2 },
+  contPlayBtn: { position: "absolute", right: 10, top: 10, width: 32, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },
   progressBar: { height: 4, borderRadius: 999, backgroundColor: COLORS.elevated, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 999 },
   genreGrid: { flexDirection: "row", gap: 6 },
   genreIcon: { flex: 1, aspectRatio: 1, borderRadius: RADIUS.md, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 2 },
   genreLabel: { color: COLORS.text, fontSize: 10, fontWeight: "700" },
-  storyCard: { width: 150, height: 210, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden", position: "relative" },
+  storyCard: { width: 160, height: 230, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden", position: "relative" },
   storyCover: { ...StyleSheet.absoluteFillObject },
-  cardShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 90 },
+  cardShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 130 },
   cardText: { position: "absolute", left: 0, right: 0, bottom: 0, padding: SPACING.sm, gap: 6 },
-  cardTitle: { color: COLORS.text, fontSize: 13, fontWeight: "800", lineHeight: 16 },
+  cardTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900", lineHeight: 17, letterSpacing: -0.2 },
+  cardMetaRow: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
+  cardMetaChip: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: RADIUS.sm, backgroundColor: "rgba(10,10,15,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
+  cardMetaText: { color: COLORS.text, fontSize: 9, fontWeight: "700" },
   genreTag: { alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.sm },
   genreTagText: { color: COLORS.bg, fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
   soonRibbon: { position: "absolute", top: 8, right: 8, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.sm },
   soonText: { color: COLORS.secondary, fontSize: 9, fontWeight: "900" },
+  flameCorner: { position: "absolute", top: 8, left: 8, width: 24, height: 24, borderRadius: 999, backgroundColor: "rgba(10,10,15,0.7)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.gemGold },
 });
