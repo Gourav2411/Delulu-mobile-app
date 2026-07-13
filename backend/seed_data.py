@@ -149,6 +149,7 @@ def build_story():
         "id": "ch1",
         "index": 0,
         "title": "A Chance Encounter",
+        "endChat": {"characterId": "rian", "prompt": "text him back?"},
         "messages": [
             m("c1m1", "narrator", "Rooftop bar. Rain misting the neon. You didn't come here to meet anyone.", 1200, "neutral", "small"),
             m("c1m2", "rian", "You lost?", 1500, "neutral", "small"),
@@ -158,8 +159,14 @@ def build_story():
             m("c1m6", "rian", "\"Come sit with me.\"", 1500, "flirty", "large"),
             m("c1m7", "narrator", "He slides a second glass across the bar without asking.", 1400, "neutral", "small",
               sfx="CLINK"),
-            m("c1m8", "PLAYER", "Bold assumption.", 800, "smug", "small"),
-            m("c1m9", "rian", "You're still standing here.", 1300, "flirty", "small"),
+            m("c1m8", "PLAYER", "", 500, "neutral", "small", choice={
+                "options": [
+                    {"text": "Sit down. Cross my legs.", "isPremium": False, "gemCost": 0, "nextMessageId": "c1m9a", "endingWeight": {"bold": 1}},
+                    {"text": "Stay standing. Sip anyway.", "isPremium": False, "gemCost": 0, "nextMessageId": "c1m9b", "endingWeight": {"safe": 1}},
+                ]
+            }),
+            m("c1m9a", "rian", "There she is.", 1200, "flirty", "small"),
+            m("c1m9b", "rian", "You're still standing here.", 1300, "flirty", "small"),
         ],
     })
 
@@ -168,6 +175,7 @@ def build_story():
         "id": "ch2",
         "index": 1,
         "title": "Rules Are Made to Break",
+        "endChat": {"characterId": "meera", "prompt": "spill to Meera?"},
         "messages": [
             m("c2m1", "meera", "you did WHAT last night??", 900, "shocked", "small"),
             m("c2m2", "PLAYER", "nothing happened.", 700, "neutral", "small"),
@@ -183,12 +191,13 @@ def build_story():
         "id": "ch3",
         "index": 2,
         "title": "Lines We Don't Cross",
+        "endChat": {"characterId": "rian", "prompt": "double text him?"},
         "messages": [
             m("c3m1", "rian", "Meet me. Tonight. Same roof.", 1400, "flirty", "large"),
             m("c3m2", "PLAYER", "I have work.", 800, "neutral", "small"),
             m("c3m3", "rian", "Then blow it off.", 1200, "flirty", "small"),
             m("c3m4", "narrator", "The cursor blinks. Your reply hasn't been sent.", 1300, "neutral", "small"),
-            # First choice point
+            # Choice point (unchanged)
             m("c3m5", "PLAYER", "", 500, "neutral", "small", choice={
                 "options": [
                     {"text": "See you at 9.", "isPremium": False, "gemCost": 0, "nextMessageId": "c3m6a", "endingWeight": {"bold": 1}},
@@ -207,38 +216,72 @@ def build_story():
         m("c4m1", "narrator", "Rooftop. 9:03 PM. He's already there.", 1200, "neutral", "small",
           panel={"imageUrl": SCENE_PANEL_ROOFTOP, "caption": "9:03 PM — the roof is his.", "isEndingPanel": False}),
         m("c4m2", "rian", "You came.", 1200, "happy", "large"),
-        m("c4m3", "PLAYER", "Don't get used to it.", 800, "smug", "small"),
-        m("c4m4", "rian", "Too late.", 1200, "flirty", "large"),
+        m("c4m3", "PLAYER", "", 500, "neutral", "small", choice={
+            "options": [
+                {"text": "Don't get used to it.", "isPremium": False, "gemCost": 0, "nextMessageId": "c4m4a", "endingWeight": {"safe": 1}},
+                {"text": "I couldn't stay away.", "isPremium": False, "gemCost": 0, "nextMessageId": "c4m4b", "endingWeight": {"bold": 2}},
+            ]
+        }),
+        m("c4m4a", "rian", "Too late.", 1200, "flirty", "large"),
+        m("c4m4b", "rian", "Say that again. Slower.", 1400, "flirty", "large"),
     ]
-    chapters.append({"id": "ch4", "index": 3, "title": "The First Crack", "messages": ch4_msgs})
+    chapters.append({"id": "ch4", "index": 3, "title": "The First Crack",
+                     "endChat": {"characterId": "rian", "prompt": "let him in?"},
+                     "messages": ch4_msgs})
 
-    chapters.append({"id": "ch5", "index": 4, "title": "Names You Shouldn't Say", "messages": [
+    chapters.append({"id": "ch5", "index": 4, "title": "Names You Shouldn't Say",
+        "endChat": {"characterId": "karan", "prompt": "hear Karan out?"},
+        "messages": [
         m("c5m1", "karan", "we need to talk about him.", 1000, "angry", "small"),
         m("c5m2", "PLAYER", "no we don't.", 800, "angry", "small"),
         m("c5m3", "karan", "he burns everything he touches.", 1400, "sad", "large"),
+        m("c5m4", "PLAYER", "", 500, "neutral", "small", choice={
+            "options": [
+                {"text": "Tell me what you know.", "isPremium": False, "gemCost": 0, "nextMessageId": "c5m5a", "endingWeight": {"safe": 2}},
+                {"text": "You don't know him.", "isPremium": False, "gemCost": 0, "nextMessageId": "c5m5b", "endingWeight": {"bold": 1}},
+                {"text": "Meet me in person.", "isPremium": True, "gemCost": 25, "nextMessageId": "c5m5c", "endingWeight": {"delulu": 1}},
+            ]
+        }),
+        m("c5m5a", "karan", "You'll wish you hadn't.", 1400, "sad", "large"),
+        m("c5m5b", "karan", "Then you're already gone.", 1200, "sad", "small"),
+        m("c5m5c", "karan", "Tomorrow. My place. Alone.", 1400, "neutral", "large"),
     ]})
 
-    chapters.append({"id": "ch6", "index": 5, "title": "Two AM", "messages": [
+    chapters.append({"id": "ch6", "index": 5, "title": "Two AM",
+        "endChat": {"characterId": "rian", "prompt": "reply at 2am?"},
+        "messages": [
         m("c6m1", "rian", "you awake?", 900, "neutral", "small"),
         m("c6m2", "PLAYER", "now i am.", 800, "neutral", "small"),
         m("c6m3", "rian", "good. i wanted to tell you something.", 1300, "flirty", "small"),
         m("c6m4", "rian", "...never mind.", 1200, "sad", "small"),
     ]})
 
-    chapters.append({"id": "ch7", "index": 6, "title": "Unsaid Truths", "messages": [
+    chapters.append({"id": "ch7", "index": 6, "title": "Unsaid Truths",
+        "endChat": {"characterId": "rian", "prompt": "call his bluff?"},
+        "messages": [
         m("c7m1", "rian", "You think I don't notice the way you look at me?", 1400, "flirty", "large"),
-        m("c7m2", "PLAYER", "Maybe I do look.", 900, "flirty", "small"),
-        m("c7m3", "rian", "Careful, sweetheart. Looking is the easy part. Falling? That's dangerous.", 1800, "flirty", "large",
+        m("c7m2", "PLAYER", "", 500, "neutral", "small", choice={
+            "options": [
+                {"text": "Maybe I do look.", "isPremium": False, "gemCost": 0, "nextMessageId": "c7m3a", "endingWeight": {"bold": 2}},
+                {"text": "Notice all you want.", "isPremium": False, "gemCost": 0, "nextMessageId": "c7m3b", "endingWeight": {"safe": 1}},
+            ]
+        }),
+        m("c7m3a", "rian", "Careful, sweetheart. Looking is the easy part. Falling? That's dangerous.", 1800, "flirty", "large",
           react={"characterId": "PLAYER", "expression": "shocked"}),
+        m("c7m3b", "rian", "Then don't get comfortable.", 1300, "flirty", "small"),
     ]})
 
-    chapters.append({"id": "ch8", "index": 7, "title": "The Fight", "messages": [
+    chapters.append({"id": "ch8", "index": 7, "title": "The Fight",
+        "endChat": {"characterId": "meera", "prompt": "vent to Meera?"},
+        "messages": [
         m("c8m1", "rian", "You told KARAN?", 1000, "angry", "large"),
         m("c8m2", "PLAYER", "he asked.", 800, "sad", "small"),
         m("c8m3", "rian", "of course he did.", 1200, "angry", "small", sfx="SLAM"),
     ]})
 
-    chapters.append({"id": "ch9", "index": 8, "title": "Come Back", "messages": [
+    chapters.append({"id": "ch9", "index": 8, "title": "Come Back",
+        "endChat": {"characterId": "rian", "prompt": "hear him out?"},
+        "messages": [
         m("c9m1", "rian", "i'm sorry.", 900, "sad", "small"),
         m("c9m2", "rian", "i shouldn't have raised my voice.", 1200, "sad", "small"),
         m("c9m3", "PLAYER", "", 500, "neutral", "small", choice={

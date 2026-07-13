@@ -190,6 +190,19 @@ class AnalyticsIn(BaseModel):
     props: Dict[str, Any] = {}
 
 
+class ChatWithCharacterIn(BaseModel):
+    storyId: str
+    chapterIndex: int
+    characterId: str
+    userMessage: str
+    history: List[Dict[str, str]] = []  # [{role: "user"|"assistant", text: "..."}]
+
+
+class SetAvatarPresetIn(BaseModel):
+    presetId: str  # preset_avatar_1..6
+    displayName: Optional[str] = None
+
+
 # ============================================================================
 # INDEXES & SEED
 # ============================================================================
@@ -547,16 +560,51 @@ async def record_ending(body: RecordEndingIn, user = Depends(get_user_from_token
 # ============================================================================
 
 GEM_PACKS = {
-    "starter": {"gems": 80, "usd": 0.99, "label": "Starter"},
-    "popular": {"gems": 500, "usd": 4.99, "label": "Popular"},
-    "best": {"gems": 1200, "usd": 9.99, "label": "Best Value"},
+    "starter":  {"gems":   80, "usd":  0.99, "label": "Starter"},
+    "popular":  {"gems":  500, "usd":  4.99, "label": "Popular"},
+    "best":     {"gems": 1200, "usd":  9.99, "label": "Best Value"},
     "treasure": {"gems": 3000, "usd": 19.99, "label": "Treasure Chest"},
 }
 
+# Per-currency prices — real IAP works this way (Play Console lets you set per-country SKUs).
+# We ship a curated table for top locales; unknown locales fall through to USD.
+CURRENCY_PRICES = {
+    "USD": {"symbol": "$",  "starter":  0.99, "popular":  4.99, "best":  9.99, "treasure":  19.99},
+    "INR": {"symbol": "₹",  "starter":  79,   "popular":  399,  "best":  799,  "treasure": 1499},
+    "EUR": {"symbol": "€",  "starter":  0.99, "popular":  4.99, "best":  9.99, "treasure":  19.99},
+    "GBP": {"symbol": "£",  "starter":  0.79, "popular":  3.99, "best":  7.99, "treasure":  15.99},
+    "AED": {"symbol": "AED","starter":  3.99, "popular": 18.99, "best": 37.99, "treasure":  74.99},
+    "BRL": {"symbol": "R$", "starter":  4.99, "popular": 24.99, "best": 49.99, "treasure":  99.99},
+    "JPY": {"symbol": "¥",  "starter":  150,  "popular":  750,  "best": 1500,  "treasure":  3000},
+    "CAD": {"symbol": "C$", "starter":  1.29, "popular":  6.49, "best": 12.99, "treasure":  24.99},
+    "AUD": {"symbol": "A$", "starter":  1.49, "popular":  7.49, "best": 14.99, "treasure":  29.99},
+    "SGD": {"symbol": "S$", "starter":  1.29, "popular":  6.49, "best": 12.99, "treasure":  25.99},
+    "MXN": {"symbol": "MX$","starter": 19,    "popular":  99,   "best": 199,   "treasure":  399},
+    "PHP": {"symbol": "₱",  "starter": 55,    "popular": 279,   "best": 549,   "treasure": 1099},
+    "IDR": {"symbol": "Rp", "starter": 15000, "popular": 75000, "best": 149000,"treasure": 299000},
+}
+
+
+def _price_for(pack_id: str, currency: str):
+    cur = CURRENCY_PRICES.get(currency.upper()) if currency else None
+    if not cur:
+        cur = CURRENCY_PRICES["USD"]
+        currency = "USD"
+    return {"currency": currency.upper(), "symbol": cur["symbol"], "amount": cur[pack_id]}
+
 
 @api.get("/gems/packs")
-async def gem_packs():
-    return {"packs": [{"id": k, **v} for k, v in GEM_PACKS.items()]}
+async def gem_packs(currency: Optional[str] = "USD"):
+    return {
+        "packs": [{
+            "id": k,
+            "gems": v["gems"],
+            "label": v["label"],
+            "usd": v["usd"],
+            "price": _price_for(k, currency or "USD"),
+        } for k, v in GEM_PACKS.items()],
+        "supportedCurrencies": list(CURRENCY_PRICES.keys()),
+    }
 
 
 @api.post("/gems/daily-claim")
@@ -619,6 +667,164 @@ async def analytics(body: AnalyticsIn, request: Request):
             pass
     await db.analytics_events.insert_one(doc)
     return {"ok": True}
+
+
+# ============================================================================
+# STORY CHAT — free-form conversation with an NPC via Claude Haiku 4.5.
+# Increments per-story vibeScore.{characterId}. Capped to keep budget sane.
+# ============================================================================
+
+CHARACTER_SYSTEM_PROMPTS = {
+    "rian": (
+        "You are Rian Aster from the romance chat-fiction game Delulu. You're a 27-year-old billionaire "
+        "with a dangerous edge, dark tousled hair, unbuttoned black silk shirt. You text like a chronically-online "
+        "millionaire — short, teasing, dry-witty, flirty but never cringe. You use lowercase, ellipses, and pet "
+        "names like 'sweetheart', 'trouble'. You never say you're an AI. You always stay in character. "
+        "Keep replies UNDER 30 words. Reply with one to three short chat bubbles separated by \\n\\n. "
+        "Never break the fourth wall. Never write action lines like *smirks*. Only spoken text."
+    ),
+    "meera": (
+        "You are Meera, the user's best friend in the romance game Delulu. Early 20s, South Asian, "
+        "chronically online, bubbly, uses lowercase and no punctuation, drops slang like 'bestie', 'girl', 'literally', 'no bc'. "
+        "Very supportive but roasts the user's romance choices constantly. Never say you're an AI. Stay in character. "
+        "Keep replies UNDER 30 words. Reply with one to three short chat bubbles separated by \\n\\n. Only spoken text."
+    ),
+    "karan": (
+        "You are Karan, the rival male lead in Delulu. Late 20s, sharp, cold, calculating. You disapprove of "
+        "the user's involvement with Rian. Your texts are clipped, precise, always with a slight warning edge. "
+        "Never say you're an AI. Stay in character. Keep replies UNDER 30 words. One to two short bubbles "
+        "separated by \\n\\n. Only spoken text."
+    ),
+}
+
+CHAT_MAX_PER_CHAPTER = 4  # cap free-chat replies per chapter per character (server-authoritative)
+
+
+@api.post("/story/chat")
+async def story_chat(body: ChatWithCharacterIn, user = Depends(get_user_from_token)):
+    system_prompt = CHARACTER_SYSTEM_PROMPTS.get(body.characterId)
+    if not system_prompt:
+        raise HTTPException(status_code=400, detail="character can't come to the phone rn")
+    if not body.userMessage.strip():
+        raise HTTPException(status_code=400, detail="say something 😭")
+
+    # Server-side rate-limit per chapter
+    key = f"{body.storyId}:{body.chapterIndex}:{body.characterId}"
+    used = int((user.get("chatQuota") or {}).get(key, 0))
+    if used >= CHAT_MAX_PER_CHAPTER:
+        raise HTTPException(status_code=403, detail="they've gone quiet. move the story along.")
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+
+    # Fresh chat every call (stateless; we replay history from client).
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage as LLMUserMessage
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"llm library missing: {e}")
+
+    chat = (LlmChat(
+        api_key=api_key,
+        session_id=f"delulu-{user['user_id']}-{key}-{int(utcnow().timestamp())}",
+        system_message=system_prompt,
+    ).with_model("anthropic", "claude-haiku-4-5-20251001"))
+
+    # Replay history: for each prior turn append into the chat context
+    # by sending prior user messages first. We don't stream — mobile expects one reply.
+    reply_text = ""
+    try:
+        # Build a compact single user message with history for cost efficiency
+        history_lines = []
+        for turn in (body.history or [])[-8:]:  # last 8 turns
+            role = "You" if turn.get("role") == "user" else body.characterId.title()
+            history_lines.append(f"{role}: {turn.get('text','').strip()}")
+        history_lines.append(f"You: {body.userMessage.strip()}")
+        composite = "\n".join(history_lines) + f"\n\n{body.characterId.title()}:"
+        response = await chat.send_message(LLMUserMessage(text=composite))
+        reply_text = (response or "").strip()
+        # Strip character prefix if the model echoed it
+        for prefix in [f"{body.characterId.title()}:", f"{body.characterId}:", "Rian:", "Meera:", "Karan:"]:
+            if reply_text.lower().startswith(prefix.lower()):
+                reply_text = reply_text[len(prefix):].lstrip()
+        # Sometimes the model emits literal backslash-n rather than a newline
+        reply_text = reply_text.replace("\\n\\n", "\n\n").replace("\\n", "\n")
+    except Exception as e:
+        log.exception("chat error")
+        raise HTTPException(status_code=502, detail=f"they didn't reply: {str(e)[:120]}")
+
+    # Bump vibe score + quota
+    story_progress = (user.get("progress") or {}).get(body.storyId, {}) or {}
+    vibe = story_progress.get("vibeScore", {}) or {}
+    vibe[body.characterId] = int(vibe.get(body.characterId, 0)) + 1
+    story_progress["vibeScore"] = vibe
+
+    quota = user.get("chatQuota") or {}
+    quota[key] = used + 1
+
+    all_progress = user.get("progress") or {}
+    all_progress[body.storyId] = story_progress
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"progress": all_progress, "chatQuota": quota}},
+    )
+
+    # Split into bubbles for the reader
+    bubbles = [b.strip() for b in reply_text.split("\n\n") if b.strip()][:3]
+    return {
+        "reply": reply_text,
+        "bubbles": bubbles or [reply_text],
+        "vibeScore": vibe,
+        "remaining": max(0, CHAT_MAX_PER_CHAPTER - (used + 1)),
+    }
+
+
+# ============================================================================
+# AVATAR PRESETS (portrait picks generated via Nano Banana)
+# ============================================================================
+
+@api.get("/avatar/presets")
+async def avatar_presets():
+    """Return AI-generated portrait presets from the media manifest, if present."""
+    manifest_path = MEDIA_DIR / "manifest.json"
+    if not manifest_path.exists():
+        return {"presets": []}
+    try:
+        import json as _json
+        m = _json.loads(manifest_path.read_text())
+    except Exception:
+        return {"presets": []}
+    presets = m.get("presets") or {}
+    base_url = (os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    items = []
+    for pid, fname in presets.items():
+        url = f"{base_url}/api/media/{fname}" if base_url else f"/api/media/{fname}"
+        items.append({"id": pid, "imageUrl": url})
+    return {"presets": items}
+
+
+@api.put("/avatar/preset")
+async def set_avatar_preset(body: SetAvatarPresetIn, user = Depends(get_user_from_token)):
+    """Set the user's avatar to a preset portrait — bypasses the layered builder."""
+    manifest_path = MEDIA_DIR / "manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="no presets available")
+    import json as _json
+    m = _json.loads(manifest_path.read_text())
+    presets = m.get("presets") or {}
+    if body.presetId not in presets:
+        raise HTTPException(status_code=404, detail="preset not found")
+    base_url = (os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    fname = presets[body.presetId]
+    url = f"{base_url}/api/media/{fname}" if base_url else f"/api/media/{fname}"
+    update = {
+        "avatarConfig.presetId": body.presetId,
+        "avatarConfig.imageUrl": url,
+    }
+    if body.displayName is not None:
+        update["avatarConfig.displayName"] = body.displayName
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": update})
+    return {"ok": True, "imageUrl": url}
 
 
 # ============================================================================

@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { storyApi, avatarApi, analyticsApi } from "@/src/api";
 import { AvatarPreview } from "@/src/AvatarPreview";
+import ChatWithCharacterSheet from "@/src/ChatWithCharacterSheet";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
 
@@ -32,6 +33,7 @@ export default function Reader() {
   const [panel, setPanel] = useState(null); // scenePanel object
   const [loading, setLoading] = useState(true);
   const [complete, setComplete] = useState(false);
+  const [chatSheet, setChatSheet] = useState(false);
   const scrollRef = useRef(null);
   const activeCharRef = useRef({ id: null, expression: "neutral" });
 
@@ -108,16 +110,23 @@ export default function Reader() {
       await storyApi.completeChapter({ storyId: s.id, chapterIndex: chIdx });
       analyticsApi.track("chapter_complete", { storyId: s.id, chapterIndex: chIdx });
     } catch {}
-    // If final chapter → ending flow
+    // Offer end-of-chapter chat if authored
+    const currentCh = s.chapters[chIdx];
+    if (currentCh?.endChat) {
+      setChatSheet({ characterId: currentCh.endChat.characterId, prompt: currentCh.endChat.prompt, chIdx });
+      return;
+    }
+    _proceedAfterChapter(s, chIdx);
+  }, []);
+
+  const _proceedAfterChapter = useCallback(async (s, chIdx) => {
     if (chIdx + 1 >= s.chapters.length) {
       const endingId = pickEndingId(s, user);
       try {
         await storyApi.recordEnding({ storyId: s.id, endingId });
         await refresh();
-        router.replace(`/ending/${s.id}?endingId=${endingId}`);
-      } catch (e) {
-        router.replace(`/ending/${s.id}?endingId=${endingId}`);
-      }
+      } catch {}
+      router.replace(`/ending/${s.id}?endingId=${endingId}`);
     } else {
       router.replace(`/chapter-end?storyId=${s.id}&chapterIndex=${chIdx}`);
     }
@@ -285,6 +294,29 @@ export default function Reader() {
           </View>
         </View>
       )}
+
+      {/* CHAT WITH CHARACTER (end-of-chapter LLM-driven free chat) */}
+      {chatSheet && (
+        <ChatWithCharacterSheet
+          visible={!!chatSheet}
+          onClose={() => {
+            const chIdx = chatSheet.chIdx;
+            setChatSheet(null);
+            _proceedAfterChapter(story, chIdx);
+          }}
+          story={story}
+          chapterIndex={chatSheet.chIdx}
+          characterId={chatSheet.characterId}
+          playerAvatarNode={
+            <AvatarPreview
+              layers={user?.avatarConfig?.layers || {}}
+              catalog={catalog}
+              presetImageUrl={user?.avatarConfig?.imageUrl}
+              size={32}
+            />
+          }
+        />
+      )}
     </View>
   );
 }
@@ -325,7 +357,12 @@ function MessageBubble({ message, story, accent, user, catalog }) {
         </View>
         {isPlayer && (
           <View style={styles.playerAvatarWrap}>
-            <AvatarPreview layers={user?.avatarConfig?.layers || {}} catalog={catalog} size={40} />
+            <AvatarPreview
+              layers={user?.avatarConfig?.layers || {}}
+              catalog={catalog}
+              presetImageUrl={user?.avatarConfig?.imageUrl}
+              size={40}
+            />
           </View>
         )}
       </View>

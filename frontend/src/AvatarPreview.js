@@ -2,7 +2,7 @@
 // works out of the box with our colour-encoded catalog. Real PNGs can drop in later
 // without changing this component (just swap the layer render to <Image />).
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { COLORS } from "@/src/theme";
 
 // A layer maps to a very simple stylised shape by slot. This is intentionally
@@ -77,8 +77,34 @@ function Layer({ slot, color, expression = "neutral" }) {
  * Compose an avatar from a layers map { slot: assetId } and a catalog list.
  * The catalog entry has { id, slot, color, zIndex }.
  * Also renders a head layer using the body colour + optional expression.
+ *
+ * If `presetImageUrl` is provided (preset avatar chosen instead of layered),
+ * render the portrait PNG directly. This is the "quick pick" hero path.
  */
-export function AvatarPreview({ layers, catalog, expression = "neutral", size = 240, showHalo = false }) {
+export function AvatarPreview({ layers, catalog, expression = "neutral", size = 240, showHalo = false, presetImageUrl }) {
+  if (presetImageUrl) {
+    return (
+      <View style={{ width: size, aspectRatio: 0.82, position: "relative" }} testID="avatar-preview">
+        {showHalo && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute", top: "12%", left: "8%", right: "8%",
+              aspectRatio: 1, borderRadius: 999,
+              backgroundColor: COLORS.romance, opacity: 0.22,
+              transform: [{ scale: 1.15 }],
+            }}
+          />
+        )}
+        <Image
+          source={{ uri: presetImageUrl }}
+          style={{ width: "100%", height: "100%", borderRadius: 12 }}
+          resizeMode="cover"
+        />
+      </View>
+    );
+  }
+
   const bg = "transparent";
   const bodyAsset = catalog.find((c) => c.id === layers?.body);
   const skinColor = bodyAsset?.color || "#D9A277";

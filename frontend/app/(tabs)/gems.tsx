@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 import { gemsApi } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
+import { detectCurrency, formatPrice } from "@/src/currency";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -16,6 +17,7 @@ export default function Gems() {
   const { user, refresh } = useAuth();
   const { msg } = useLocalSearchParams();
   const [packs, setPacks] = useState([]);
+  const [currency] = useState(() => detectCurrency());
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(msg || null);
   const [busy, setBusy] = useState(false);
@@ -23,7 +25,7 @@ export default function Gems() {
 
   const load = async () => {
     try {
-      const { packs } = await gemsApi.packs();
+      const { packs } = await gemsApi.packs(currency);
       setPacks(packs);
     } catch {}
   };
@@ -149,13 +151,13 @@ export default function Gems() {
                 </View>
               </View>
               <View style={styles.priceBtn}>
-                <Text style={styles.priceText}>${p.usd}</Text>
+                <Text style={styles.priceText}>{formatPrice(p.price) || `$${p.usd}`}</Text>
               </View>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.legal}>MOCK PurchaseService. dev-only buttons for now.</Text>
+        <Text style={styles.legal}>MOCK PurchaseService · prices in {currency} · dev buttons for now</Text>
       </ScrollView>
     </View>
   );

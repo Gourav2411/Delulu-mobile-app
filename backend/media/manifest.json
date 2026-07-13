@@ -29,5 +29,13 @@
     "panel_rooftop": "scene_panel_rooftop.png",
     "panel_ending": "scene_panel_ending.png"
   },
-  "cover": "cover_flagship.png"
+  "cover": "cover_flagship.png",
+  "presets": {
+    "preset_avatar_1": "preset_avatar_1.png",
+    "preset_avatar_2": "preset_avatar_2.png",
+    "preset_avatar_3": "preset_avatar_3.png",
+    "preset_avatar_4": "preset_avatar_4.png",
+    "preset_avatar_5": "preset_avatar_5.png",
+    "preset_avatar_6": "preset_avatar_6.png"
+  }
 }

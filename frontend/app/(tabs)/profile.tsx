@@ -69,7 +69,13 @@ export default function Profile() {
         <View style={styles.showcase}>
           <LinearGradient colors={[`${COLORS.romance}44`, "transparent"]} style={StyleSheet.absoluteFill} />
           <View style={styles.avatarBox} testID="profile-avatar">
-            <AvatarPreview layers={user?.avatarConfig?.layers || {}} catalog={catalog} size={180} showHalo />
+            <AvatarPreview
+              layers={user?.avatarConfig?.layers || {}}
+              catalog={catalog}
+              presetImageUrl={user?.avatarConfig?.imageUrl}
+              size={180}
+              showHalo
+            />
           </View>
           <Text style={styles.name}>{displayName}</Text>
           <View style={styles.badge}>

@@ -73,14 +73,16 @@ export const storyApi = {
 
 export const avatarApi = {
   catalog: () => api.get("/avatar/catalog"),
+  presets: () => api.get("/avatar/presets"),
   setConfig: (layers, displayName) => api.put("/avatar/config", { layers, displayName }),
+  setPreset: (presetId, displayName) => api.put("/avatar/preset", { presetId, displayName }),
   saveLook: (name, layers) => api.post("/avatar/looks", { name, layers }),
   deleteLook: (id) => api.del(`/avatar/looks/${id}`),
   buyItem: (itemId) => api.post("/avatar/buy-item", { itemId }),
 };
 
 export const gemsApi = {
-  packs: () => api.get("/gems/packs"),
+  packs: (currency) => api.get(`/gems/packs${currency ? `?currency=${currency}` : ""}`),
   daily: () => api.post("/gems/daily-claim", {}),
   buyMock: (packId) => api.post("/gems/buy-mock", { packId }),
 };

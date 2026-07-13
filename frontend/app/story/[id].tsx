@@ -101,7 +101,12 @@ export default function StoryDetail() {
               {/* Player card */}
               <View style={styles.charCard}>
                 <View style={[styles.playerAvatar, { borderColor: accent }]}>
-                  <AvatarPreview layers={user?.avatarConfig?.layers || {}} catalog={catalog} size={64} />
+                  <AvatarPreview
+                    layers={user?.avatarConfig?.layers || {}}
+                    catalog={catalog}
+                    presetImageUrl={user?.avatarConfig?.imageUrl}
+                    size={64}
+                  />
                 </View>
                 <Text style={styles.charName}>You</Text>
                 <Text style={styles.charRole}>the MC</Text>
