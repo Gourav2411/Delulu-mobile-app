@@ -5,7 +5,9 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { storyApi } from "@/src/api";
+import ReAnimated, { FadeInDown } from "react-native-reanimated";
+import { storyApi, avatarApi } from "@/src/api";
+import { AvatarPreview } from "@/src/AvatarPreview";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, GENRE_ACCENT, RADIUS, SPACING, VOICE } from "@/src/theme";
 
@@ -15,13 +17,15 @@ export default function Home() {
   const router = useRouter();
   const { user, refresh } = useAuth();
   const [stories, setStories] = useState([]);
+  const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const { stories } = await storyApi.list();
+      const [{ stories }, { items }] = await Promise.all([storyApi.list(), avatarApi.catalog()]);
       setStories(stories);
+      setCatalog(items);
     } catch (e) {
       // handled silently for now
     }
@@ -71,10 +75,27 @@ export default function Home() {
           <View style={styles.brand}>
             <Text style={styles.wordmark}>delulu</Text>
           </View>
-          <View style={styles.streakChip}>
-            <Ionicons name="flame" size={14} color={COLORS.gemGold} />
-            <Text style={styles.streakText}>{user?.streak ?? 0}</Text>
-          </View>
+          <TouchableOpacity
+            testID="home-avatar-chip"
+            activeOpacity={0.85}
+            onPress={() => router.push("/(tabs)/profile")}
+            style={styles.avatarChipWrap}
+          >
+            <View style={styles.avatarChipInner}>
+              <AvatarPreview
+                layers={user?.avatarConfig?.layers || {}}
+                catalog={catalog}
+                presetImageUrl={user?.avatarConfig?.imageUrl}
+                size={38}
+              />
+            </View>
+            {(user?.streak ?? 0) > 0 && (
+              <View style={styles.streakFlag}>
+                <Ionicons name="flame" size={9} color={COLORS.bg} />
+                <Text style={styles.streakFlagText}>{user.streak}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
@@ -82,6 +103,74 @@ export default function Home() {
         contentContainerStyle={{ paddingBottom: SPACING.xxl }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.romance} />}
       >
+        {/* Featured this week — horizontal snap carousel */}
+        {stories.length > 1 && (
+          <View style={styles.featuredWrap}>
+            <View style={styles.featuredHead}>
+              <View style={styles.featuredEyebrowRow}>
+                <Ionicons name="star" size={12} color={COLORS.gemGold} />
+                <Text style={styles.featuredEyebrow}>FEATURED THIS WEEK</Text>
+              </View>
+              <Text style={styles.featuredCount}>{stories.length}</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={296}
+              decelerationRate="fast"
+              contentContainerStyle={styles.featuredRail}
+            >
+              {stories.map((s, idx) => (
+                <ReAnimated.View key={s.id} entering={FadeInDown.duration(320).delay(idx * 60)}>
+                  <TouchableOpacity
+                    testID={`featured-${s.id}`}
+                    activeOpacity={0.9}
+                    onPress={() => router.push(`/story/${s.id}`)}
+                    style={styles.featuredCard}
+                  >
+                    <Image source={{ uri: s.coverUrl }} style={StyleSheet.absoluteFillObject} />
+                    <LinearGradient
+                      colors={["transparent", "rgba(10,10,15,0.45)", "rgba(10,10,15,0.95)"]}
+                      locations={[0, 0.5, 1]}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    <LinearGradient
+                      colors={[`${s.accentColor}55`, "transparent"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    <View style={styles.featuredContent}>
+                      <View style={styles.featuredTopRow}>
+                        <View style={[styles.featuredGenre, { backgroundColor: s.accentColor }]}>
+                          <Text style={styles.featuredGenreText}>{cap(s.genre)}</Text>
+                        </View>
+                        {s.status === "coming_soon" && (
+                          <View style={styles.featuredSoon}>
+                            <Text style={styles.featuredSoonText}>SOON</Text>
+                          </View>
+                        )}
+                        {s.isFlagship && (
+                          <View style={styles.featuredFlame}>
+                            <Ionicons name="flame" size={11} color={COLORS.gemGold} />
+                            <Text style={styles.featuredFlameText}>HOT</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View>
+                        <Text numberOfLines={2} style={styles.featuredTitle}>{s.title}</Text>
+                        <Text numberOfLines={1} style={styles.featuredSub}>
+                          {s.tropeTags?.slice(0, 2).join(" · ") || formatReads(s.totalReads) + " reads"}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </ReAnimated.View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Flagship hero — cinematic full-bleed */}
         {flagship && (
           <TouchableOpacity
@@ -254,8 +343,27 @@ const styles = StyleSheet.create({
   gemChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill },
   gemIcon: { width: 10, height: 10, backgroundColor: COLORS.gemGold, transform: [{ rotate: "45deg" }] },
   gemNum: { color: COLORS.gemGold, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  streakChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill },
-  streakText: { color: COLORS.text, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  avatarChipWrap: { width: 44, height: 44, borderRadius: 999, position: "relative" },
+  avatarChipInner: { width: 44, height: 44, borderRadius: 999, backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.romance, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  streakFlag: { position: "absolute", top: -6, right: -6, backgroundColor: COLORS.gemGold, borderRadius: 999, minWidth: 20, height: 18, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1, borderWidth: 2, borderColor: COLORS.bg },
+  streakFlagText: { color: COLORS.bg, fontSize: 10, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  featuredWrap: { marginTop: SPACING.md },
+  featuredHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm },
+  featuredEyebrowRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  featuredEyebrow: { color: COLORS.gemGold, fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
+  featuredCount: { color: COLORS.secondary, fontSize: 12 },
+  featuredRail: { gap: 12, paddingHorizontal: SPACING.lg, paddingBottom: 4 },
+  featuredCard: { width: 284, height: 168, borderRadius: RADIUS.lg, overflow: "hidden", backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  featuredContent: { flex: 1, padding: SPACING.md, justifyContent: "space-between" },
+  featuredTopRow: { flexDirection: "row", gap: 6, alignItems: "center" },
+  featuredGenre: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.sm },
+  featuredGenreText: { color: COLORS.bg, fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
+  featuredSoon: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.sm, backgroundColor: "rgba(10,10,15,0.65)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
+  featuredSoonText: { color: COLORS.text, fontSize: 9, fontWeight: "900" },
+  featuredFlame: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.sm, backgroundColor: "rgba(255,201,74,0.15)", borderWidth: 1, borderColor: COLORS.gemGold },
+  featuredFlameText: { color: COLORS.gemGold, fontSize: 9, fontWeight: "900" },
+  featuredTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900", letterSpacing: -0.5, lineHeight: 21 },
+  featuredSub: { color: COLORS.secondary, fontSize: 11, marginTop: 3 },
   hero: { marginHorizontal: SPACING.lg, borderRadius: RADIUS.xl, overflow: "hidden", height: 380, marginTop: SPACING.md, borderWidth: 1, borderColor: COLORS.border, shadowColor: COLORS.romance, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 24, elevation: 12 },
   heroImg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
   heroContent: { position: "absolute", left: 0, right: 0, bottom: 0, padding: SPACING.lg, gap: 10 },

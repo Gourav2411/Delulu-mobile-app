@@ -11,6 +11,7 @@ import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
 import { detectCurrency, formatPrice } from "@/src/currency";
 import { storage } from "@/src/utils/storage";
+import { useToast } from "@/src/Toast";
 
 const CURRENCY_KEY = "delulu.currency.override";
 const CURRENCIES = [
@@ -34,6 +35,7 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 export default function Gems() {
   const { user, refresh } = useAuth();
   const { msg } = useLocalSearchParams();
+  const toast = useToast();
   const [packs, setPacks] = useState([]);
   const [currency, setCurrency] = useState("USD");
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -55,6 +57,8 @@ export default function Gems() {
     setShowCurrencyPicker(false);
     await storage.setItem(CURRENCY_KEY, code);
     await load(code);
+    const cur = CURRENCIES.find((c) => c.code === code);
+    toast.show(`prices now in ${cur?.flag || ""} ${code}`, { icon: "cash" });
   };
 
   useEffect(() => {

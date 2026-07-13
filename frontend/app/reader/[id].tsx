@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import ReAnimated, { FadeInDown, FadeInUp, ZoomIn } from "react-native-reanimated";
 import { storyApi, avatarApi, analyticsApi } from "@/src/api";
 import { AvatarPreview } from "@/src/AvatarPreview";
 import ChatWithCharacterSheet from "@/src/ChatWithCharacterSheet";

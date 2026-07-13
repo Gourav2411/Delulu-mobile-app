@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider } from "@/src/AuthContext";
+import { ToastProvider } from "@/src/Toast";
 import { COLORS } from "@/src/theme";
 
 LogBox.ignoreAllLogs(true);
@@ -33,13 +34,15 @@ export default function RootLayout() {
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         <StatusBar style="light" />
         <AuthProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: COLORS.bg },
-              animation: "fade",
-            }}
-          />
+          <ToastProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: COLORS.bg },
+                animation: "fade",
+              }}
+            />
+          </ToastProvider>
         </AuthProvider>
       </View>
     </SafeAreaProvider>
