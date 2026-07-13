@@ -1,0 +1,33 @@
+{
+  "characters": {
+    "rian": {
+      "neutral": "char_rian_neutral.png",
+      "happy": "char_rian_happy.png",
+      "flirty": "char_rian_flirty.png",
+      "angry": "char_rian_angry.png",
+      "shocked": "char_rian_shocked.png",
+      "sad": "char_rian_sad.png"
+    },
+    "meera": {
+      "neutral": "char_meera_neutral.png",
+      "happy": "char_meera_happy.png",
+      "flirty": "char_meera_flirty.png",
+      "angry": "char_meera_angry.png",
+      "shocked": "char_meera_shocked.png",
+      "sad": "char_meera_sad.png"
+    },
+    "karan": {
+      "neutral": "char_karan_neutral.png",
+      "happy": "char_karan_happy.png",
+      "flirty": "char_karan_flirty.png",
+      "angry": "char_karan_angry.png",
+      "shocked": "char_karan_shocked.png",
+      "sad": "char_karan_sad.png"
+    }
+  },
+  "scenes": {
+    "panel_rooftop": "scene_panel_rooftop.png",
+    "panel_ending": "scene_panel_ending.png"
+  },
+  "cover": "cover_flagship.png"
+}

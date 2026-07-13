@@ -5,6 +5,7 @@ Schema mirrors the Firestore layout in the spec so migration is a rename job lat
 """
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -634,6 +635,13 @@ async def health():
 # ============================================================================
 
 app.include_router(api)
+
+# Static media mount for AI-generated portraits + panels.
+# Prefixed with /api/media so k8s ingress routes it to backend.
+MEDIA_DIR = ROOT_DIR / "media"
+MEDIA_DIR.mkdir(exist_ok=True)
+app.mount("/api/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,

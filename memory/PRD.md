@@ -32,7 +32,7 @@ Delulu is a dark-mode-only interactive fiction ("chat story") mobile app built w
 
 ## Deferred (explicit follow-ups)
 - Admin web panel (backend endpoints ready — story JSON editor, avatar asset uploader, per-story metrics)
-- AI generation pipeline for NPC expression sets + scene panels via Nano Banana (Emergent LLM key already in env)
+- ~~AI generation pipeline for NPC expression sets + scene panels via Nano Banana~~ ✅ **DONE** — see `/app/backend/generate_assets.py`. Produces 3 chars × 6 expressions + 1 cover + 2 scene panels using gemini-3.1-flash-image-preview. Manifest at `/app/backend/media/manifest.json`. Assets served at `/api/media/*`. Seed auto-swaps to AI URLs when manifest is present.
 - Real Google Play Billing / Apple IAP via RevenueCat (native build required)
 - Push notifications (Emergent-managed; requires native build)
 - Offline caching of unlocked chapters

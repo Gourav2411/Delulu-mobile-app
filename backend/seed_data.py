@@ -3,11 +3,42 @@ Delulu seed data:
 - 15 avatar assets across skin / eyes / mouth / hair / outfit / accessory slots (color-encoded placeholders)
 - 1 flagship romance story "Falling for the Enigma" — 10 chapters, 2 choice points, 3 endings, 2 scene panels, PLAYER messages
 """
+import json
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# AI-asset manifest (produced by /app/backend/generate_assets.py)
+# ---------------------------------------------------------------------------
+
+BASE_URL = (os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/")
+MANIFEST_PATH = Path(__file__).parent / "media" / "manifest.json"
+
+
+def _load_manifest():
+    if not MANIFEST_PATH.exists():
+        return None
+    try:
+        return json.loads(MANIFEST_PATH.read_text())
+    except Exception:
+        return None
+
+
+def _media_url(filename):
+    if not filename:
+        return None
+    if BASE_URL:
+        return f"{BASE_URL}/api/media/{filename}"
+    return f"/api/media/{filename}"
+
+
+_MANIFEST = _load_manifest()
 
 
 # ============================================================================
@@ -50,7 +81,15 @@ ACCENT = "#FF3E8A"
 
 # Use royalty-free style image URLs (unsplash placeholders) for cover / panels / character portraits
 # NPC has 6 expressions: neutral / happy / flirty / angry / shocked / sad
-RIAN_PORTRAITS = {
+def _char_portraits(char_id, fallback):
+    """Return {expression: url} — AI-generated when manifest exists, fallback otherwise."""
+    if _MANIFEST and _MANIFEST.get("characters", {}).get(char_id):
+        m = _MANIFEST["characters"][char_id]
+        return {expr: _media_url(m.get(expr)) or fallback[expr] for expr in fallback}
+    return fallback
+
+
+_RIAN_FALLBACK = {
     "neutral": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=500&q=80",
     "happy":   "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&q=80",
     "flirty":  "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=500&q=80",
@@ -58,7 +97,7 @@ RIAN_PORTRAITS = {
     "shocked": "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=500&q=80",
     "sad":     "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&q=80",
 }
-MEERA_PORTRAITS = {
+_MEERA_FALLBACK = {
     "neutral": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&q=80",
     "happy":   "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&q=80",
     "flirty":  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&q=80",
@@ -66,7 +105,7 @@ MEERA_PORTRAITS = {
     "shocked": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80",
     "sad":     "https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=500&q=80",
 }
-KARAN_PORTRAITS = {
+_KARAN_FALLBACK = {
     "neutral": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&q=80",
     "happy":   "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=500&q=80",
     "flirty":  "https://images.unsplash.com/photo-1552058544-f2b08422138a?w=500&q=80",
@@ -75,9 +114,16 @@ KARAN_PORTRAITS = {
     "sad":     "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80",
 }
 
-COVER = "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=1000&q=80"
-SCENE_PANEL_ROOFTOP = "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&q=80"
-SCENE_PANEL_ENDING = "https://images.unsplash.com/photo-1502224562085-639556652f33?w=1200&q=80"
+RIAN_PORTRAITS = _char_portraits("rian", _RIAN_FALLBACK)
+MEERA_PORTRAITS = _char_portraits("meera", _MEERA_FALLBACK)
+KARAN_PORTRAITS = _char_portraits("karan", _KARAN_FALLBACK)
+
+COVER = (_MANIFEST and _media_url(_MANIFEST.get("cover"))) or \
+    "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=1000&q=80"
+SCENE_PANEL_ROOFTOP = (_MANIFEST and _media_url(_MANIFEST.get("scenes", {}).get("panel_rooftop"))) or \
+    "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&q=80"
+SCENE_PANEL_ENDING = (_MANIFEST and _media_url(_MANIFEST.get("scenes", {}).get("panel_ending"))) or \
+    "https://images.unsplash.com/photo-1502224562085-639556652f33?w=1200&q=80"
 
 
 def m(mid, sender, text, delay=1400, expression="neutral", size="small", react=None, sfx=None, panel=None, choice=None):
