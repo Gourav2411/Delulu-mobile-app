@@ -43,7 +43,7 @@ PRESETS = [
 def load_manifest():
     if MANIFEST_PATH.exists():
         try: return json.loads(MANIFEST_PATH.read_text())
-        except: return {}
+        except Exception: return {}
     return {}
 
 

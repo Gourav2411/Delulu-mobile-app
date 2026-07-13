@@ -142,6 +142,17 @@ export default function Profile() {
 
         {/* Row items */}
         <View style={styles.section}>
+          <TouchableOpacity
+            testID="profile-ending-wall"
+            onPress={() => { Haptics.selectionAsync(); router.push("/endings"); }}
+            style={styles.rowItem}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="ribbon" size={18} color={COLORS.gemGold} />
+            <Text style={styles.rowText}>ending wall</Text>
+            <Text style={{ color: COLORS.gemGold, fontWeight: "800", fontSize: 12, marginRight: 4 }}>{endings.length}</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.secondary} />
+          </TouchableOpacity>
           <RowItem icon="trophy" label="achievements" />
           <RowItem icon="bookmark" label="bookmarks" />
           <RowItem icon="settings" label="settings" />

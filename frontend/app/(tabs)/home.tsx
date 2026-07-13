@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import ReAnimated, { FadeInDown } from "react-native-reanimated";
+import ReAnimated, { FadeInDown, useSharedValue, withSequence, withTiming, useAnimatedStyle, withDelay } from "react-native-reanimated";
 import { storyApi, avatarApi } from "@/src/api";
 import { AvatarPreview } from "@/src/AvatarPreview";
 import { useAuth } from "@/src/AuthContext";
@@ -20,6 +20,34 @@ export default function Home() {
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Streak shake: if streak > 0 and >= 20h since last claim, wobble the flag
+  const streakAtRisk = (() => {
+    if (!user?.streak || !user?.lastDailyClaim) return false;
+    const last = new Date(user.lastDailyClaim).getTime();
+    const hoursSince = (Date.now() - last) / 3600000;
+    return hoursSince >= 20 && hoursSince < 48;
+  })();
+  const shake = useSharedValue(0);
+  useEffect(() => {
+    if (!streakAtRisk) return;
+    const loop = () => {
+      shake.value = withSequence(
+        withTiming(-1, { duration: 60 }),
+        withTiming(1, { duration: 60 }),
+        withTiming(-1, { duration: 60 }),
+        withTiming(1, { duration: 60 }),
+        withTiming(0, { duration: 60 }),
+        withDelay(2500, withTiming(0, { duration: 0 })),
+      );
+    };
+    loop();
+    const iv = setInterval(loop, 3200);
+    return () => clearInterval(iv);
+  }, [streakAtRisk, shake]);
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${shake.value * 12}deg` }, { scale: 1 + Math.abs(shake.value) * 0.15 }],
+  }));
 
   const load = useCallback(async () => {
     try {
@@ -90,10 +118,10 @@ export default function Home() {
               />
             </View>
             {(user?.streak ?? 0) > 0 && (
-              <View style={styles.streakFlag}>
+              <ReAnimated.View style={[styles.streakFlag, streakAtRisk && shakeStyle, streakAtRisk && { backgroundColor: COLORS.romance }]}>
                 <Ionicons name="flame" size={9} color={COLORS.bg} />
                 <Text style={styles.streakFlagText}>{user.streak}</Text>
-              </View>
+              </ReAnimated.View>
             )}
           </TouchableOpacity>
         </View>

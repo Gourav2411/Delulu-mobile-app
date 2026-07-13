@@ -109,7 +109,7 @@ export default function StoryDetail() {
                   />
                 </View>
                 <Text style={styles.charName}>You</Text>
-                <Text style={styles.charRole}>the MC</Text>
+                <Text style={styles.charRole} numberOfLines={1}>{user?.avatarConfig?.trait || "the MC"}</Text>
               </View>
               {story.characters.filter((c) => c.id !== "narrator").map((c) => (
                 <View key={c.id} style={styles.charCard}>

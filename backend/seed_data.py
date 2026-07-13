@@ -341,6 +341,88 @@ def build_story():
 
 
 # ============================================================================
+# STORY #2: BURN NOTICE — thriller, 5 chapters, uses Karan as ML.
+# ============================================================================
+
+def build_story_burn_notice():
+    chapters = [
+        {"id": "b1", "index": 0, "title": "Signal", "endChat": {"characterId": "karan", "prompt": "reply to karan?"}, "messages": [
+            m("b1m1", "narrator", "3:47 AM. Encrypted text. Number you don't recognize.", 1300, "neutral", "small"),
+            m("b1m2", "karan", "don't respond to anyone else. just me.", 1500, "neutral", "small"),
+            m("b1m3", "PLAYER", "who is this?", 900, "shocked", "small"),
+            m("b1m4", "karan", "someone who kept you alive tonight.", 1600, "neutral", "large"),
+            m("b1m5", "PLAYER", "", 500, "neutral", "small", choice={
+                "options": [
+                    {"text": "Prove it.", "isPremium": False, "gemCost": 0, "nextMessageId": "b1m6a", "endingWeight": {"trust": 1}},
+                    {"text": "Losing your number.", "isPremium": False, "gemCost": 0, "nextMessageId": "b1m6b", "endingWeight": {"burn": 1}},
+                ]
+            }),
+            m("b1m6a", "karan", "look at the window. across the street. i just closed the blinds.", 1800, "neutral", "large"),
+            m("b1m6b", "karan", "you won't. and we both know it.", 1500, "neutral", "small"),
+        ]},
+        {"id": "b2", "index": 1, "title": "The Photograph", "endChat": {"characterId": "karan", "prompt": "ask what he knows?"}, "messages": [
+            m("b2m1", "karan", "check your mailbox. i left something.", 1200, "neutral", "small"),
+            m("b2m2", "narrator", "One photo. You. At last week's gallery. You'd told no one you went.", 1600, "neutral", "small", sfx="!!!"),
+            m("b2m3", "PLAYER", "how did you get this?", 900, "shocked", "small"),
+            m("b2m4", "karan", "same way HE did. only i'm on your side.", 1500, "neutral", "large"),
+        ]},
+        {"id": "b3", "index": 2, "title": "The Setup", "endChat": {"characterId": "karan", "prompt": "trust him?"}, "messages": [
+            m("b3m1", "karan", "meet me. tonight. rooftop of the concordia.", 1400, "neutral", "large"),
+            m("b3m2", "PLAYER", "", 500, "neutral", "small", choice={
+                "options": [
+                    {"text": "I'll be there.", "isPremium": False, "gemCost": 0, "nextMessageId": "b3m3a", "endingWeight": {"trust": 2}},
+                    {"text": "Bring your evidence to my place. Public entrance.", "isPremium": False, "gemCost": 0, "nextMessageId": "b3m3b", "endingWeight": {"safe": 2}},
+                    {"text": "Meet me at the docks. My rules.", "isPremium": True, "gemCost": 25, "nextMessageId": "b3m3c", "endingWeight": {"burn": 2}},
+                ]
+            }),
+            m("b3m3a", "karan", "good. don't tell anyone.", 1300, "neutral", "small"),
+            m("b3m3b", "karan", "fine. one hour.", 1200, "angry", "small"),
+            m("b3m3c", "karan", "you have my attention.", 1400, "happy", "large"),
+        ]},
+        {"id": "b4", "index": 3, "title": "Exit Wound", "endChat": {"characterId": "karan", "prompt": "one last question?"}, "messages": [
+            m("b4m1", "narrator", "He's already there when you arrive. Face lit by his phone. Something's wrong.", 1500, "neutral", "small"),
+            m("b4m2", "karan", "we have four minutes before they get here.", 1400, "shocked", "large"),
+            m("b4m3", "PLAYER", "who?", 700, "shocked", "small"),
+            m("b4m4", "karan", "the people i work for.", 1500, "sad", "small"),
+        ]},
+        {"id": "b5", "index": 4, "title": "The Truth", "endChat": None, "messages": [
+            m("b5m1", "karan", "everything i told you was true. except the part about being on your side.", 1800, "sad", "large"),
+            m("b5m2", "PLAYER", "why tell me now?", 900, "sad", "small"),
+            m("b5m3", "karan", "because now i actually am.", 1500, "sad", "large",
+              react={"characterId": "PLAYER", "expression": "shocked"}),
+            m("b5m4", "narrator", "", 1200, "neutral", "small",
+              panel={"imageUrl": SCENE_PANEL_ENDING, "caption": "trust is the only weapon that cuts both ways.", "isEndingPanel": True}),
+        ]},
+    ]
+    endings = [
+        {"id": "burn_safe",  "name": "Walk Away Clean", "rarityPercent": 42, "shareCardConfig": {"headline": "GOOD ending", "subtitle": "you survived.", "accent": "#3E9BFF"}},
+        {"id": "burn_trust", "name": "Partners in the Dark", "rarityPercent": 22, "shareCardConfig": {"headline": "EPIC ending", "subtitle": "he chose you back.", "accent": "#3E9BFF"}},
+        {"id": "burn_burn",  "name": "Set It All On Fire", "rarityPercent": 6, "shareCardConfig": {"headline": "RARE ending", "subtitle": "you burned it down together.", "accent": "#FFC94A"}},
+    ]
+    characters = [
+        {"id": "karan", "name": "Karan", "role": "Male Lead", "avatarUrl": KARAN_PORTRAITS["neutral"], "portraitUrls": KARAN_PORTRAITS},
+        {"id": "meera", "name": "Meera", "role": "Best Friend", "avatarUrl": MEERA_PORTRAITS["neutral"], "portraitUrls": MEERA_PORTRAITS},
+        {"id": "narrator", "name": "Narrator", "role": "narration", "avatarUrl": None, "portraitUrls": {}},
+    ]
+    return {
+        "id": "burn_notice",
+        "title": "Burn Notice",
+        "genre": "thriller",
+        "accentColor": "#3E9BFF",
+        "coverUrl": "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1000&q=80",
+        "synopsis": "One transmission. One rooftop. One person who's been watching. You have four minutes to decide who to trust.",
+        "tropeTags": ["Spy Thriller", "Enemies to Lovers", "One Night"],
+        "characters": characters,
+        "chapters": chapters,
+        "endings": endings,
+        "status": "live",
+        "isFlagship": True,
+        "ageRating": "16+",
+        "totalReads": 12480,
+    }
+
+
+# ============================================================================
 # SEED RUNNER
 # ============================================================================
 
@@ -353,6 +435,10 @@ async def seed_all(db):
     story = build_story()
     await db.stories.update_one({"id": story["id"]}, {"$set": story}, upsert=True)
 
+    # Story #2 — thriller
+    burn = build_story_burn_notice()
+    await db.stories.update_one({"id": burn["id"]}, {"$set": burn}, upsert=True)
+
     # A couple of coming-soon stubs so the home page has genre variety
     coming_soon = [
         {
@@ -360,13 +446,6 @@ async def seed_all(db):
             "coverUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1000&q=80",
             "synopsis": "One transmission. Twelve survivors. And a voice that knows your name.",
             "tropeTags": ["Space Horror", "Slow Burn"], "characters": [], "chapters": [], "endings": [],
-            "status": "coming_soon", "isFlagship": False, "totalReads": 0,
-        },
-        {
-            "id": "burn_notice", "title": "Burn Notice", "genre": "thriller", "accentColor": "#3E9BFF",
-            "coverUrl": "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1000&q=80",
-            "synopsis": "You had one job. Don't answer his calls.",
-            "tropeTags": ["Spy", "Second Chance"], "characters": [], "chapters": [], "endings": [],
             "status": "coming_soon", "isFlagship": False, "totalReads": 0,
         },
         {

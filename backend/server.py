@@ -796,10 +796,20 @@ async def avatar_presets():
         return {"presets": []}
     presets = m.get("presets") or {}
     base_url = (os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/")
+
+    # Human-readable trait labels used for "starring you as: …"
+    traits = {
+        "preset_avatar_1": "the caramel-hair girl",
+        "preset_avatar_2": "the bomber-jacket boy",
+        "preset_avatar_3": "the dark-bob girl",
+        "preset_avatar_4": "the leather-jacket boy",
+        "preset_avatar_5": "the platinum enigma",
+        "preset_avatar_6": "the pink-hair chaos",
+    }
     items = []
     for pid, fname in presets.items():
         url = f"{base_url}/api/media/{fname}" if base_url else f"/api/media/{fname}"
-        items.append({"id": pid, "imageUrl": url})
+        items.append({"id": pid, "imageUrl": url, "trait": traits.get(pid, "the main character")})
     return {"presets": items}
 
 
@@ -817,9 +827,18 @@ async def set_avatar_preset(body: SetAvatarPresetIn, user = Depends(get_user_fro
     base_url = (os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/")
     fname = presets[body.presetId]
     url = f"{base_url}/api/media/{fname}" if base_url else f"/api/media/{fname}"
+    traits = {
+        "preset_avatar_1": "the caramel-hair girl",
+        "preset_avatar_2": "the bomber-jacket boy",
+        "preset_avatar_3": "the dark-bob girl",
+        "preset_avatar_4": "the leather-jacket boy",
+        "preset_avatar_5": "the platinum enigma",
+        "preset_avatar_6": "the pink-hair chaos",
+    }
     update = {
         "avatarConfig.presetId": body.presetId,
         "avatarConfig.imageUrl": url,
+        "avatarConfig.trait": traits.get(body.presetId, "the main character"),
     }
     if body.displayName is not None:
         update["avatarConfig.displayName"] = body.displayName
