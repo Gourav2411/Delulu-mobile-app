@@ -36,9 +36,19 @@ async function request(method, path, body) {
     json = { detail: text };
   }
   if (!res.ok) {
-    const err = new Error(json.detail || `HTTP ${res.status}`);
+    // FastAPI returns validation errors as a list of {loc, msg, ...} objects.
+    // Normalize into a human-readable string so callers can always render it.
+    let detailStr;
+    if (Array.isArray(json.detail)) {
+      detailStr = json.detail.map((e) => (e?.msg ? e.msg : JSON.stringify(e))).join(", ");
+    } else if (json.detail && typeof json.detail === "object") {
+      detailStr = json.detail.msg || JSON.stringify(json.detail);
+    } else {
+      detailStr = json.detail || `HTTP ${res.status}`;
+    }
+    const err = new Error(String(detailStr));
     err.status = res.status;
-    err.detail = json.detail;
+    err.detail = detailStr;
     throw err;
   }
   return json;

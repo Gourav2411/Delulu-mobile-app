@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 3 verified the HIGH-severity auth-crash fix from iteration 2. Fix lives in /app/frontend/src/api.js request() — it now coerces json.detail into a string (Array.isArray -> join .msg fields; object -> .msg or JSON.stringify; else raw). Verified end-to-end on mobile viewport 390x844: invalid-email signup (422 list detail), short-password signup (400 string detail), and 401 login all render as readable strings inside testID='auth-error' with no React red-screen. All 3 previous user-bug regressions (genre single-row, profile→/avatar-builder, gems USD→INR) still pass. Backend contract validated with 3 new pytest cases (all pass).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "app/auth.tsx (and any other TouchableOpacity/Pressable in the app)", "issue": "Non-blocking console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. React Native 0.74+ moved pointerEvents from prop to style. Consider migrating. Reference: recurring runtime warning across screens."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_error_normalization.py",
+    "/app/test_reports/pytest/pytest_iter3.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional: migrate `pointerEvents` prop to `style.pointerEvents` on TouchableOpacity/Pressable usages to silence the deprecation warning.",
+    "Optional: consider adding client-side email regex + password>=6 pre-flight in auth.tsx so the 422/400 path is rarer in practice."
+  ],
+  "critical_code_review_comments": [
+    "api.js request() normalization is correctly placed at the network boundary so ALL callers (auth.tsx, chapter-end.tsx, ChatWithCharacterSheet.js) that read err.detail get a string. Verified via grep: no other file constructs UI text from a raw json.detail array/object.",
+    "Error precedence in auth.tsx `setErr(e.detail || e.message || fallback)` is fine now that api.js guarantees e.detail is always a string when present.",
+    "server.py still 872 lines (unchanged from iter 2) — recommend splitting into routers (auth/avatar/stories/gems/chat)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_error_normalization.py (new — 3 tests: 422 list detail shape, 401 string detail, 400 short-pw string detail)"
+  ],
+  "success_rate": {"backend": "100% (3/3 iter3, plus 38/38 preserved from iter2)", "frontend": "100% (3/3 fix-verification cases + 3/3 regression cases)"},
+  "seed_data_creation": "None — tests probe existing endpoints with throwaway payloads.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Auth error path is now safe. api.js request() coerces FastAPI's `detail` (list of {type,loc,msg,input,ctx} on 422, string on 4xx/500, or object) into a plain string before throwing. Any screen that reads err.detail (auth.tsx uses testID='auth-error') will render a readable message. Login regression string 'no account with those vibes' and 'password needs at least 6 chars, bestie' both verified. Backend URL is https://chat-fiction-lab.preview.emergentagent.com. Test user test1@delulu.dev / delulu123 works.",
+  "rca_of_issue": "Root cause was renderer-side: FastAPI's default RequestValidationError serializer emits `detail` as `List[Dict]`, but the client threw with `err.detail = json.detail` and the UI passed that through <Text>{err}</Text>. React refuses non-primitive children. Fix (verified): centralize normalization at the fetch boundary in api.js so the Error always carries a string .detail. This is preferable to per-screen try/catch coercion because it covers all future screens too."
+}
