@@ -10,6 +10,7 @@ import { storyApi, avatarApi } from "@/src/api";
 import { AvatarPreview } from "@/src/AvatarPreview";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
+import { formatReadCount, pluralize } from "@/src/utils/format";
 
 export default function StoryDetail() {
   const router = useRouter();
@@ -74,7 +75,9 @@ export default function StoryDetail() {
                 <Text style={styles.genreTagText}>{cap(story.genre)}</Text>
               </View>
               <Text style={styles.meta}>{story.ageRating || "16+"}</Text>
-              <Text style={styles.meta}>· {formatReads(story.totalReads)} reads</Text>
+              {formatReadCount((story.seedReads || 0) + (story.totalReads || 0)) && (
+                <Text style={styles.meta}>· {formatReadCount((story.seedReads || 0) + (story.totalReads || 0))}</Text>
+              )}
             </View>
             {story.tropeTags?.length > 0 && (
               <View style={styles.trope}>
@@ -191,11 +194,6 @@ export default function StoryDetail() {
 }
 
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
-function formatReads(n) {
-  if (!n) return "0";
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return `${n}`;
-}
 
 const styles = StyleSheet.create({
   loading: { flex: 1, backgroundColor: COLORS.bg, alignItems: "center", justifyContent: "center" },

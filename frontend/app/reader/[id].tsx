@@ -19,6 +19,11 @@ import { AvatarPreview } from "@/src/AvatarPreview";
 import ChatWithCharacterSheet from "@/src/ChatWithCharacterSheet";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
+import { storage } from "@/src/utils/storage";
+import { makeResolver } from "@/src/utils/tokens";
+
+// Persisted flag: has the user seen the reader coach overlay at least once?
+const COACH_SEEN_KEY = "delulu.reader.coachSeen.v1";
 
 export default function Reader() {
   const router = useRouter();
@@ -35,14 +40,66 @@ export default function Reader() {
   const [loading, setLoading] = useState(true);
   const [complete, setComplete] = useState(false);
   const [chatSheet, setChatSheet] = useState(false);
+  const [showCoach, setShowCoach] = useState(false); // one-time reader coach overlay
+  const [needsPicker, setNeedsPicker] = useState([]); // charIds still needing a manual pick
   const scrollRef = useRef(null);
   const activeCharRef = useRef({ id: null, expression: "neutral" });
+  const refreshUser = refresh; // alias so the cast-load block reads clearly
+
+  // Token resolver + variant-aware character lookup. Recomputed whenever
+  // identity/casting/story changes.
+  const resolveText = useMemo(() => makeResolver(user, story), [user, story]);
+  const characterFor = useCallback((charId) => {
+    if (!story || !charId) return null;
+    const char = story.characters.find((c) => c.id === charId);
+    if (!char) return null;
+    const variantKey = (user?.storyCastings || {})[story.id]?.[charId];
+    const variant = variantKey && char.variants ? char.variants[variantKey] : null;
+    if (!variant) return char;
+    // Return a merged view: variant's name/portraits/avatarUrl override the
+    // base character's for the current casting.
+    return {
+      ...char,
+      name: variant.name || char.name,
+      avatarUrl: variant.avatarUrl || char.avatarUrl,
+      portraitUrls: variant.portraitUrls || char.portraitUrls,
+    };
+  }, [story, user]);
+
+  // First-ever chapter → show a one-time coach mark explaining the auto-play flow.
+  // The overlay dismisses on tap and never blocks reading progression again.
+  useEffect(() => {
+    (async () => {
+      const seen = await storage.getItem(COACH_SEEN_KEY, null);
+      if (!seen) setShowCoach(true);
+    })();
+  }, []);
+
+  const dismissCoach = useCallback(async () => {
+    setShowCoach(false);
+    try { await storage.setItem(COACH_SEEN_KEY, "1"); } catch {}
+    Haptics.selectionAsync();
+    analyticsApi.track("reader_coach_dismissed", {});
+  }, []);
 
   useEffect(() => {
     (async () => {
       const [s, c] = await Promise.all([storyApi.get(id), avatarApi.catalog()]);
       setStory(s);
       setCatalog(c.items);
+      // Identity-aware casting: on story open, ensure the love interests
+      // have been cast for this user. `storyApi.cast` is idempotent and fires
+      // analytics only on freshly-cast characters.
+      try {
+        const castRes = await storyApi.cast({ storyId: id });
+        // If the backend says we still need picker (e.g. preference=everyone),
+        // the reader will prompt the user before Chapter 1 auto-plays.
+        if (castRes?.needsPicker?.length) {
+          setNeedsPicker(castRes.needsPicker);
+        }
+        // Refresh user to pull the latest storyCastings into context
+        try { await refreshUser(); } catch {}
+      } catch {}
       setLoading(false);
       analyticsApi.track("story_start", { storyId: id, chapterIndex: chapterIdx });
       // Auto-reveal first message
@@ -230,7 +287,7 @@ export default function Reader() {
               const m = messages[mIdx];
               if (!m) return null;
               if (m.choicePoint || m.scenePanel) return null; // handled elsewhere
-              return <MessageBubble key={m.id} message={m} story={story} accent={accent} user={user} catalog={catalog} />;
+              return <MessageBubble key={m.id} message={m} story={story} accent={accent} user={user} catalog={catalog} resolveText={resolveText} characterFor={characterFor} />;
             })}
 
             {typing && activeChar && (
@@ -292,7 +349,7 @@ export default function Reader() {
                 style={[styles.choiceCard, opt.isPremium && styles.choiceCardPremium]}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.choiceText, opt.isPremium && { color: COLORS.gemGold }]}>{opt.text}</Text>
+                  <Text style={[styles.choiceText, opt.isPremium && { color: COLORS.gemGold }]}>{resolveText ? resolveText(opt.text) : opt.text}</Text>
                   {opt.isPremium && <Text style={styles.choicePremiumHelper}>premium choice · more impact</Text>}
                 </View>
                 {opt.isPremium ? (
@@ -331,6 +388,99 @@ export default function Reader() {
           }
         />
       )}
+
+      {/* First-run reader coach mark — dismiss on any tap */}
+      {showCoach && (
+        <TouchableWithoutFeedback onPress={dismissCoach}>
+          <View style={styles.coachOverlay} testID="reader-coach-overlay">
+            <View style={styles.coachCard}>
+              <View style={styles.coachIconWrap}>
+                <Ionicons name="hand-left" size={26} color={COLORS.gemGold} />
+              </View>
+              <Text style={styles.coachTitle}>welcome to the drama</Text>
+              <Text style={styles.coachBody}>{VOICE.coachFirstChapter}</Text>
+              <View style={styles.coachCta}>
+                <Text style={styles.coachCtaText}>{VOICE.coachDismiss}</Text>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      )}
+
+      {/* Love-interest picker (romancePreference == "everyone") */}
+      {needsPicker.length > 0 && story && (
+        <LoveInterestPicker
+          story={story}
+          charIds={needsPicker}
+          onCast={async (map) => {
+            try {
+              await storyApi.cast({ storyId: id, castings: map });
+              try { await refreshUser(); } catch {}
+            } catch {}
+            setNeedsPicker([]);
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+/**
+ * Bottom-sheet-style overlay shown when the user's romance preference is
+ * "everyone" and a story hasn't been cast yet. Presents each love interest
+ * with masc + femme variant thumbnails; user taps to lock in the casting.
+ */
+function LoveInterestPicker({ story, charIds, onCast }) {
+  const [pending, setPending] = useState(() => ({}));
+  const remaining = charIds.filter((cid) => !pending[cid]);
+  const allChosen = remaining.length === 0;
+
+  return (
+    <View style={styles.pickerOverlay} testID="reader-li-picker">
+      <View style={styles.pickerCard}>
+        <Ionicons name="sparkles" size={24} color={COLORS.romance} />
+        <Text style={styles.pickerTitle}>who's your lead?</Text>
+        <Text style={styles.pickerBody}>you can only pick once per story. choose your fighter.</Text>
+        {charIds.map((cid) => {
+          const char = story.characters.find((c) => c.id === cid);
+          if (!char) return null;
+          const chosen = pending[cid];
+          return (
+            <View key={cid} style={styles.pickerRow}>
+              <Text style={styles.pickerCharLabel}>{char.role || "Love Interest"}</Text>
+              <View style={styles.pickerOptRow}>
+                {["masc", "femme"].map((v) => {
+                  const variant = char.variants?.[v];
+                  if (!variant) return null;
+                  const active = chosen === v;
+                  return (
+                    <TouchableOpacity
+                      key={v}
+                      testID={`li-picker-${cid}-${v}`}
+                      activeOpacity={0.85}
+                      onPress={() => { Haptics.selectionAsync(); setPending((s) => ({ ...s, [cid]: v })); }}
+                      style={[styles.pickerOptCard, active && { borderColor: COLORS.romance, backgroundColor: `${COLORS.romance}22` }]}
+                    >
+                      <Image source={{ uri: variant.avatarUrl }} style={styles.pickerOptImg} />
+                      <Text style={styles.pickerOptName} numberOfLines={1}>{variant.name}</Text>
+                      {active && <View style={styles.pickerCheck}><Ionicons name="checkmark" size={12} color={COLORS.bg} /></View>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })}
+        <TouchableOpacity
+          testID="li-picker-confirm"
+          activeOpacity={0.9}
+          disabled={!allChosen}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onCast(pending); }}
+          style={[styles.pickerConfirm, !allChosen && { opacity: 0.4 }]}
+        >
+          <Text style={styles.pickerConfirmText}>{allChosen ? "start the spiral" : "pick a lead"}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -339,16 +489,19 @@ export default function Reader() {
 // Bubble + supporting components
 // -----------------------------------------------------------------------
 
-function MessageBubble({ message, story, accent, user, catalog }) {
+function MessageBubble({ message, story, accent, user, catalog, resolveText, characterFor }) {
   const isPlayer = message.senderCharacterId === "PLAYER";
   const isNarrator = message.senderCharacterId === "narrator";
-  const char = story.characters.find((c) => c.id === message.senderCharacterId);
+  const char = characterFor ? characterFor(message.senderCharacterId) : story.characters.find((c) => c.id === message.senderCharacterId);
   const portrait = char?.portraitUrls?.[message.expression || "neutral"] || char?.avatarUrl;
+  // Resolve any {p_*} / {c_*} tokens embedded in the text so player and
+  // variant-cast characters read correctly.
+  const textResolved = resolveText ? resolveText(message.text) : message.text;
 
   if (isNarrator) {
     return (
       <View style={styles.narratorRow}>
-        <Text style={styles.narrator}>{message.text}</Text>
+        <Text style={styles.narrator}>{textResolved}</Text>
         {message.sfxText && <SfxText text={message.sfxText} accent={accent} />}
       </View>
     );
@@ -366,7 +519,7 @@ function MessageBubble({ message, story, accent, user, catalog }) {
           styles.bubble,
           isPlayer ? [styles.playerBubble, { borderColor: accent }] : styles.npcBubble,
         ]}>
-          <Text style={styles.bubbleText}>{message.text}</Text>
+          <Text style={styles.bubbleText}>{textResolved}</Text>
           <Text style={styles.bubbleTs}>{fmtTime()}</Text>
         </View>
         {isPlayer && (
@@ -492,4 +645,26 @@ const styles = StyleSheet.create({
   gemPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: "rgba(255,201,74,0.15)", borderWidth: 1, borderColor: COLORS.gemGold },
   gemDotSm: { width: 8, height: 8, backgroundColor: COLORS.gemGold, transform: [{ rotate: "45deg" }] },
   gemPillText: { color: COLORS.gemGold, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  // Reader coach overlay
+  coachOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(10,10,15,0.72)", alignItems: "center", justifyContent: "center", padding: SPACING.xl, zIndex: 999 },
+  coachCard: { width: "100%", maxWidth: 320, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gemGold, padding: SPACING.lg, gap: 10, alignItems: "center", shadowColor: COLORS.gemGold, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 20 },
+  coachIconWrap: { width: 56, height: 56, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: `${COLORS.gemGold}22`, borderWidth: 1, borderColor: COLORS.gemGold },
+  coachTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900", letterSpacing: -0.4, marginTop: 4 },
+  coachBody: { color: COLORS.secondary, fontSize: 13, textAlign: "center", lineHeight: 18 },
+  coachCta: { marginTop: 6, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: COLORS.gemGold, borderRadius: RADIUS.pill },
+  coachCtaText: { color: COLORS.bg, fontWeight: "900", fontSize: 13, letterSpacing: 0.3 },
+  // Love-interest picker overlay
+  pickerOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(10,10,15,0.85)", alignItems: "center", justifyContent: "center", padding: SPACING.xl, zIndex: 1000 },
+  pickerCard: { width: "100%", maxWidth: 360, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.romance, padding: SPACING.lg, gap: SPACING.md, alignItems: "center", shadowColor: COLORS.romance, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 20 },
+  pickerTitle: { color: COLORS.text, fontSize: 20, fontWeight: "900", letterSpacing: -0.4 },
+  pickerBody: { color: COLORS.secondary, fontSize: 12, textAlign: "center", lineHeight: 16, marginTop: -6 },
+  pickerRow: { alignSelf: "stretch", gap: 8 },
+  pickerCharLabel: { color: COLORS.secondary, fontSize: 10, fontWeight: "900", letterSpacing: 1.5, textTransform: "uppercase" },
+  pickerOptRow: { flexDirection: "row", gap: 10 },
+  pickerOptCard: { flex: 1, alignItems: "center", padding: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.elevated, borderWidth: 1.5, borderColor: COLORS.border, gap: 6, position: "relative" },
+  pickerOptImg: { width: 64, height: 64, borderRadius: 999, backgroundColor: COLORS.bg },
+  pickerOptName: { color: COLORS.text, fontSize: 12, fontWeight: "800", letterSpacing: -0.1 },
+  pickerCheck: { position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: 999, backgroundColor: COLORS.romance, alignItems: "center", justifyContent: "center" },
+  pickerConfirm: { alignSelf: "stretch", backgroundColor: COLORS.romance, paddingVertical: 14, borderRadius: RADIUS.pill, alignItems: "center", marginTop: 6 },
+  pickerConfirmText: { color: COLORS.bg, fontWeight: "900", fontSize: 15, letterSpacing: -0.2 },
 });

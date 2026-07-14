@@ -10,6 +10,7 @@ import { storyApi, avatarApi } from "@/src/api";
 import { AvatarPreview } from "@/src/AvatarPreview";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, GENRE_ACCENT, RADIUS, SPACING, VOICE } from "@/src/theme";
+import { formatReadCount, pluralize } from "@/src/utils/format";
 
 const GENRE_ORDER = ["romance", "thriller", "horror", "scifi", "drama"];
 
@@ -74,14 +75,34 @@ export default function Home() {
     setRefreshing(false);
   };
 
-  const flagship = stories.find((s) => s.isFlagship);
-  const byGenre = GENRE_ORDER.map((g) => ({ genre: g, list: stories.filter((s) => s.genre === g && !s.isFlagship) }));
-
-  // continue reading: any story with progress and unfinished chapterIndex
+  // ── Dedupe: a story may appear in ONLY ONE module per screen ────────────
+  // Priority (highest wins): continue reading > flagship hero > featured rail > genre rails
   const progress = user?.progress || {};
   const continueList = stories
     .filter((s) => progress[s.id] && (progress[s.id].chapterIndex || 0) < (s.chapters?.length || 0))
     .map((s) => ({ story: s, chapterIndex: progress[s.id].chapterIndex || 0 }));
+  const continueIds = new Set(continueList.map((c) => c.story.id));
+
+  // Hero: highest-priority story NOT in continueList. Prefer the flagship the user
+  // hasn't started yet; fall back to the first flagship.
+  const flagship = stories.find((s) => s.isFlagship && !continueIds.has(s.id))
+    || stories.find((s) => s.isFlagship)
+    || null;
+  const heroId = flagship?.id;
+  const usedIds = new Set([...continueIds, ...(heroId ? [heroId] : [])]);
+
+  // Featured rail: stories not yet used, prefer live+flagships first, cap at 6 tiles
+  const featuredList = stories
+    .filter((s) => !usedIds.has(s.id))
+    .sort((a, b) => (b.isFlagship - a.isFlagship) || ((b.seedReads || 0) - (a.seedReads || 0)))
+    .slice(0, 6);
+  featuredList.forEach((s) => usedIds.add(s.id));
+
+  // Genre rails: whatever's left, grouped by genre
+  const byGenre = GENRE_ORDER.map((g) => ({
+    genre: g,
+    list: stories.filter((s) => s.genre === g && !usedIds.has(s.id)),
+  }));
 
   if (loading) {
     return (
@@ -132,14 +153,14 @@ export default function Home() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.romance} />}
       >
         {/* Featured this week — horizontal snap carousel */}
-        {stories.length > 1 && (
+        {featuredList.length > 0 && (
           <View style={styles.featuredWrap}>
             <View style={styles.featuredHead}>
               <View style={styles.featuredEyebrowRow}>
                 <Ionicons name="star" size={12} color={COLORS.gemGold} />
                 <Text style={styles.featuredEyebrow}>FEATURED THIS WEEK</Text>
               </View>
-              <Text style={styles.featuredCount}>{stories.length}</Text>
+              <Text style={styles.featuredCount}>{featuredList.length}</Text>
             </View>
             <ScrollView
               horizontal
@@ -148,7 +169,7 @@ export default function Home() {
               decelerationRate="fast"
               contentContainerStyle={styles.featuredRail}
             >
-              {stories.map((s, idx) => (
+              {featuredList.map((s, idx) => (
                 <ReAnimated.View key={s.id} entering={FadeInDown.duration(320).delay(idx * 60)}>
                   <TouchableOpacity
                     testID={`featured-${s.id}`}
@@ -188,7 +209,9 @@ export default function Home() {
                       <View>
                         <Text numberOfLines={2} style={styles.featuredTitle}>{s.title}</Text>
                         <Text numberOfLines={1} style={styles.featuredSub}>
-                          {s.tropeTags?.slice(0, 2).join(" · ") || formatReads(s.totalReads) + " reads"}
+                          {s.tropeTags?.slice(0, 2).join(" · ")
+                            || formatReadCount((s.seedReads || 0) + (s.totalReads || 0))
+                            || "new · start reading"}
                         </Text>
                       </View>
                     </View>
@@ -228,9 +251,11 @@ export default function Home() {
                 <View style={styles.pillBadgeOutline}>
                   <Text style={styles.pillBadgeOutlineText}>{flagship.ageRating || "16+"}</Text>
                 </View>
-                <View style={styles.pillBadgeOutline}>
-                  <Text style={styles.pillBadgeOutlineText}>{formatReads(flagship.totalReads)} reads</Text>
-                </View>
+                {formatReadCount((flagship.seedReads || 0) + (flagship.totalReads || 0)) && (
+                  <View style={styles.pillBadgeOutline}>
+                    <Text style={styles.pillBadgeOutlineText}>{formatReadCount((flagship.seedReads || 0) + (flagship.totalReads || 0))}</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.heroTitle}>{flagship.title}</Text>
               <Text style={styles.heroSub} numberOfLines={2}>{flagship.synopsis}</Text>
@@ -271,7 +296,7 @@ export default function Home() {
                     <View style={{ flex: 1, padding: SPACING.sm, justifyContent: "space-between" }}>
                       <View>
                         <Text numberOfLines={1} style={styles.contTitle}>{story.title}</Text>
-                        <Text style={styles.contChapter}>Ch. {chapterIndex + 1} of {total} · {pct}%</Text>
+                        <Text style={styles.contChapter}>Ch. {chapterIndex + 1} of {pluralize(total, "chapter")} · {pct}%</Text>
                       </View>
                       <View style={styles.progressBar}>
                         <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: story.accentColor }]} />
@@ -354,12 +379,6 @@ export default function Home() {
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
 function genreIcon(g) {
   return { romance: "heart", thriller: "flash", horror: "flame", scifi: "planet", drama: "cafe" }[g] || "star";
-}
-function formatReads(n) {
-  if (!n) return "0";
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return `${n}`;
 }
 
 const styles = StyleSheet.create({

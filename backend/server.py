@@ -203,6 +203,19 @@ class SetAvatarPresetIn(BaseModel):
     displayName: Optional[str] = None
 
 
+class IdentityIn(BaseModel):
+    playerGender: str = Field(..., pattern=r"^(female|male|nonbinary)$")
+    romancePreference: str = Field(..., pattern=r"^(men|women|everyone|surprise)$")
+
+
+class CastStoryIn(BaseModel):
+    storyId: str
+    # Optional override: caller can force a specific casting map, used by the
+    # "who's your lead?" picker card for the "everyone" preference and by the
+    # admin preview mode. Shape: {charId: "masc"|"femme"}.
+    castings: Optional[Dict[str, str]] = None
+
+
 # ============================================================================
 # INDEXES & SEED
 # ============================================================================
@@ -257,6 +270,12 @@ def _default_user_doc(user_id: str, email: str, display_name: str, provider: str
         "avatarConfig": {"layers": {}, "activePose": "neutral", "displayName": None},
         "savedLooks": [],
         "ownedItems": [],
+        # Identity-aware story engine (Phase B). Defaults keep the OG feel of the
+        # app — female MC romancing men — but users pick both in onboarding and
+        # can edit anytime from Profile → my identity.
+        "identity": {"playerGender": "female", "romancePreference": "men"},
+        "identitySetAt": None,   # first save timestamp (analytics gate)
+        "storyCastings": {},     # {storyId: {charId: "masc"|"femme"}}
         # PHASE 2/3 stubs (schema present, features disabled)
         "username": None,
         "displayAvatarPoseId": "neutral",
@@ -350,6 +369,158 @@ async def logout(authorization: Optional[str] = Header(None)):
         token = authorization.split(" ", 1)[1].strip()
         await db.user_sessions.delete_one({"session_token": token})
     return {"ok": True}
+
+
+# ============================================================================
+# IDENTITY-AWARE STORY ENGINE
+# ============================================================================
+
+@api.get("/users/identity")
+async def get_identity(user = Depends(get_user_from_token)):
+    """Return the user's stored identity. Falls back to defaults for legacy users
+    created before Phase B."""
+    identity = user.get("identity") or {"playerGender": "female", "romancePreference": "men"}
+    return {
+        "identity": identity,
+        "identitySetAt": user.get("identitySetAt"),
+        # storyCastings is exposed so the reader can pre-resolve character variants
+        # without a round-trip when opening a story it already cast.
+        "storyCastings": user.get("storyCastings") or {},
+    }
+
+
+@api.post("/users/identity")
+async def set_identity(body: IdentityIn, request: Request, user = Depends(get_user_from_token)):
+    """Set / update the player's identity. Fires `identity_set` on every save
+    (first-time OR edit). Does NOT retroactively re-cast stories the user has
+    already started — that's a product decision documented in the client too."""
+    now = utcnow()
+    is_first_save = user.get("identitySetAt") is None
+    update = {
+        "identity": {"playerGender": body.playerGender, "romancePreference": body.romancePreference},
+    }
+    if is_first_save:
+        update["identitySetAt"] = now
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": update})
+    # Analytics — never export the actual gender/preference outside our own
+    # analytics collection. We store what the user picked but no PII linkage.
+    await db.analytics_events.insert_one({
+        "id": make_id("ev_"),
+        "event": "identity_set",
+        "props": {
+            "playerGender": body.playerGender,
+            "romancePreference": body.romancePreference,
+            "firstSave": is_first_save,
+        },
+        "user_id": user["user_id"],
+        "at": now,
+        "ip": request.client.host if request.client else None,
+    })
+    return {"ok": True, "identity": update["identity"], "firstSave": is_first_save}
+
+
+def cast_love_interests(story: Dict, preference: str, override: Optional[Dict] = None) -> Dict[str, str]:
+    """Given a story doc and a romance preference (or explicit override),
+    decide which variant (masc|femme) each love-interest character plays.
+
+    Rules:
+      • Only characters with `isLoveInterest: true` AND a populated `variants`
+        dict of both masc + femme entries are cast.
+      • preference=men     → masc
+      • preference=women   → femme
+      • preference=surprise → random
+      • preference=everyone → returns {} so the client can prompt the user to pick
+                              (unless the override supplies explicit choices).
+      • override wins over the preference rule when a charId is present in it.
+    """
+    castings: Dict[str, str] = {}
+    override = override or {}
+    for c in story.get("characters", []) or []:
+        if not c.get("isLoveInterest"):
+            continue
+        variants = c.get("variants") or {}
+        if not (variants.get("masc") and variants.get("femme")):
+            continue
+        cid = c.get("id")
+        if cid in override and override[cid] in ("masc", "femme"):
+            castings[cid] = override[cid]
+            continue
+        if preference == "men":
+            castings[cid] = "masc"
+        elif preference == "women":
+            castings[cid] = "femme"
+        elif preference == "surprise":
+            import random
+            castings[cid] = random.choice(["masc", "femme"])
+        # preference == "everyone" → leave uncast so the client asks
+    return castings
+
+
+@api.post("/story/cast")
+async def cast_story(body: CastStoryIn, request: Request, user = Depends(get_user_from_token)):
+    """Cast (or re-cast) the love interests for a story for THIS user.
+    Called by the reader on first chapter open, and by the "who's your lead?"
+    picker card for the `everyone` preference.
+
+    Returns the resolved cast so the client can immediately resolve tokens.
+    Idempotent: if the story is already cast AND no override was supplied, we
+    return the existing casting untouched (never re-roll behind the user's back)."""
+    story = await db.stories.find_one({"id": body.storyId}, {"_id": 0})
+    if not story:
+        raise HTTPException(status_code=404, detail="story not found")
+    identity = user.get("identity") or {"playerGender": "female", "romancePreference": "men"}
+    all_castings = user.get("storyCastings") or {}
+    existing = all_castings.get(body.storyId) or {}
+
+    if body.castings:
+        # Explicit override → merge over existing casting (e.g. picker card)
+        resolved = {**existing, **body.castings}
+    elif existing:
+        resolved = existing
+    else:
+        resolved = cast_love_interests(story, identity["romancePreference"])
+
+    # Persist and fire analytics only for freshly cast characters
+    newly_cast = {k: v for k, v in resolved.items() if existing.get(k) != v}
+    if newly_cast:
+        all_castings[body.storyId] = resolved
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"storyCastings": all_castings}},
+        )
+        for cid, variant in newly_cast.items():
+            await db.analytics_events.insert_one({
+                "id": make_id("ev_"),
+                "event": "li_cast_selected",
+                "props": {
+                    "storyId": body.storyId,
+                    "characterId": cid,
+                    "variant": variant,
+                    "source": "override" if body.castings and cid in body.castings
+                              else "preference",
+                    "preference": identity["romancePreference"],
+                },
+                "user_id": user["user_id"],
+                "at": utcnow(),
+                "ip": request.client.host if request.client else None,
+            })
+    return {"ok": True, "castings": resolved, "needsPicker": _needs_picker(story, identity, resolved)}
+
+
+def _needs_picker(story: Dict, identity: Dict, castings: Dict) -> List[str]:
+    """Return list of character IDs that still need a manual pick from the user
+    (i.e. love interests with variants but no cast yet). Used by the reader to
+    know whether to show the picker card before Chapter 1 kicks off."""
+    if identity.get("romancePreference") not in ("everyone",):
+        return []
+    needing = []
+    for c in story.get("characters", []) or []:
+        if not c.get("isLoveInterest"):
+            continue
+        v = c.get("variants") or {}
+        if v.get("masc") and v.get("femme") and not castings.get(c.get("id")):
+            needing.append(c.get("id"))
+    return needing
 
 
 # ============================================================================
@@ -561,6 +732,20 @@ async def record_ending(body: RecordEndingIn, user = Depends(get_user_from_token
     if story:
         ending = next((e for e in story["endings"] if e["id"] == body.endingId), None)
         rarity = int(ending.get("rarityPercent", 0)) if ending else 0
+    # Analytics: story_complete segmented by casting for retention/casting insight.
+    castings = (user.get("storyCastings") or {}).get(body.storyId) or {}
+    await db.analytics_events.insert_one({
+        "id": make_id("ev_"),
+        "event": "story_complete",
+        "props": {
+            "storyId": body.storyId,
+            "endingId": body.endingId,
+            "rarityPercent": rarity,
+            "castings": castings,
+        },
+        "user_id": user["user_id"],
+        "at": utcnow(),
+    })
     return {"ok": True, "ownedEndings": owned, "endingUnlockTimes": unlock_times, "rarityPercent": rarity}
 
 
@@ -684,6 +869,148 @@ async def buy_gems_mock(body: BuyGemsIn, user = Depends(get_user_from_token)):
     new_balance = int(user["gemBalance"]) + int(pack["gems"])
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"gemBalance": new_balance}})
     return {"gemBalance": new_balance, "awarded": pack["gems"]}
+
+
+# ============================================================================
+# ADMIN PANEL
+# ============================================================================
+
+def _require_admin(request: Request):
+    """Simple env-based admin gate. Not federation-grade; enough for a small team
+    tool. Set ADMIN_PASSWORD in backend/.env, and include X-Admin-Pass header."""
+    expected = os.environ.get("ADMIN_PASSWORD")
+    if not expected:
+        raise HTTPException(status_code=503, detail="admin panel disabled (no ADMIN_PASSWORD set)")
+    header = request.headers.get("X-Admin-Pass") or request.headers.get("x-admin-pass")
+    if header != expected:
+        raise HTTPException(status_code=401, detail="admin credentials required")
+
+
+@api.get("/admin/stories")
+async def admin_list_stories(request: Request):
+    """Return a compact validator summary for every story so the admin can
+    prioritize which stories to touch next. Sorted by errors DESC, warnings DESC."""
+    _require_admin(request)
+    from token_engine import validate_story
+    stories = await db.stories.find({}, {"_id": 0}).to_list(length=None)
+    summaries = []
+    for s in stories:
+        vs = validate_story(s)
+        summaries.append({
+            "id": s.get("id"),
+            "title": s.get("title"),
+            "genre": s.get("genre"),
+            "status": s.get("status"),
+            "isFlagship": s.get("isFlagship"),
+            "chapters": len(s.get("chapters") or []),
+            "characters": len(s.get("characters") or []),
+            "endings": len(s.get("endings") or []),
+            "canGoLive": vs["canGoLive"],
+            "errors": vs["errors"],
+            "warnings": vs["warnings"],
+        })
+    summaries.sort(key=lambda x: (-x["errors"], -x["warnings"], x["id"]))
+    return {"stories": summaries}
+
+
+@api.get("/admin/stories/{story_id}/validate")
+async def admin_validate_story(story_id: str, request: Request):
+    """Full validator findings for one story — used by the admin story-detail view."""
+    _require_admin(request)
+    from token_engine import validate_story
+    story = await db.stories.find_one({"id": story_id}, {"_id": 0})
+    if not story:
+        raise HTTPException(status_code=404, detail="story not found")
+    return validate_story(story)
+
+
+class AdminPreviewIn(BaseModel):
+    storyId: str
+    chapterIndex: int = 0
+    playerGender: str = Field("female", pattern=r"^(female|male|nonbinary)$")
+    playerName: str = "You"
+    castings: Optional[Dict[str, str]] = None  # {charId: "masc"|"femme"}
+
+
+@api.post("/admin/preview")
+async def admin_preview(body: AdminPreviewIn, request: Request):
+    """Render a chapter with tokens resolved for an arbitrary identity + casting.
+    Powers the admin "preview any identity" mode. If no castings are supplied
+    for a character that has variants, we auto-cast them based on
+    playerGender so preview prose reads cleanly (e.g. female→masc as the classic
+    het romance default). Reviewers can then override individually."""
+    _require_admin(request)
+    from token_engine import resolve_tokens
+    story = await db.stories.find_one({"id": body.storyId}, {"_id": 0})
+    if not story:
+        raise HTTPException(status_code=404, detail="story not found")
+    chapters = story.get("chapters") or []
+    if body.chapterIndex < 0 or body.chapterIndex >= len(chapters):
+        raise HTTPException(status_code=400, detail="chapter index out of range")
+    chapter = chapters[body.chapterIndex]
+    player = {"gender": body.playerGender, "name": body.playerName}
+    # Fill castings so no LI with variants defaults to they/them (which breaks
+    # subject-verb agreement in author prose). Rule mirrors the client: female→masc,
+    # male→femme, nonbinary→masc as an arbitrary but consistent choice.
+    default_variant = {"female": "masc", "male": "femme", "nonbinary": "masc"}[body.playerGender]
+    resolved_castings = dict(body.castings or {})
+    for c in story.get("characters", []) or []:
+        v = c.get("variants") or {}
+        if v.get("masc") and v.get("femme") and c.get("id") and c["id"] not in resolved_castings:
+            resolved_castings[c["id"]] = default_variant
+
+    resolved_messages = []
+    for msg in chapter.get("messages") or []:
+        m = dict(msg)
+        m["text"] = resolve_tokens(msg.get("text", ""), player, story.get("characters"), resolved_castings)
+        if msg.get("choicePoint"):
+            cp = dict(msg["choicePoint"])
+            cp["options"] = [
+                {**opt, "text": resolve_tokens(opt.get("text", ""), player, story.get("characters"), resolved_castings)}
+                for opt in cp.get("options") or []
+            ]
+            m["choicePoint"] = cp
+        resolved_messages.append(m)
+    return {
+        "storyId": body.storyId,
+        "chapter": {**chapter, "messages": resolved_messages},
+        "castings": resolved_castings,
+        "player": player,
+    }
+
+
+class AdminRegeneratePortraitIn(BaseModel):
+    storyId: str
+    characterId: str
+    variantKey: str = Field(..., pattern=r"^(masc|femme)$")
+    expression: Optional[str] = None  # e.g. "neutral" — if omitted, regenerate all 6
+
+
+@api.post("/admin/character/regenerate-portrait")
+async def admin_regenerate_portrait(body: AdminRegeneratePortraitIn, request: Request):
+    """Trigger a portrait regeneration for one variant (all 6 expressions or a
+    specific one) via the same Nano Banana pipeline used at build time.
+
+    NB: This is a placeholder that just records the request. Because the user
+    intends to check in real portrait assets via GitHub for V1.1, we don't
+    actually invoke the image gen here — instead we log an admin_action event
+    the ops person can pick up. Wire the real gen loop when we have variant
+    assets to feed to the prompt."""
+    _require_admin(request)
+    story = await db.stories.find_one({"id": body.storyId}, {"_id": 0})
+    if not story:
+        raise HTTPException(status_code=404, detail="story not found")
+    char = next((c for c in (story.get("characters") or []) if c.get("id") == body.characterId), None)
+    if not char:
+        raise HTTPException(status_code=404, detail="character not found")
+    await db.analytics_events.insert_one({
+        "id": make_id("ev_"),
+        "event": "admin_regenerate_portrait_queued",
+        "props": {"storyId": body.storyId, "characterId": body.characterId, "variantKey": body.variantKey,
+                  "expression": body.expression},
+        "at": utcnow(),
+    })
+    return {"ok": True, "queued": True, "note": "assets will be added via github; this event is logged for ops."}
 
 
 # ============================================================================

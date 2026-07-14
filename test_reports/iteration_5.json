@@ -1,0 +1,37 @@
+{
+  "summary": "Delulu V1.1 Phase A regression PASSED end-to-end. Backend 15/15 pytest: (1) GET /api/stories returns exactly 32 stories including burn_notice + falling_for_the_enigma + s01..s30; legacy IDs the_last_signal/midnight_house/understudy absent. (2) Every story has integer seedReads>0; burn_notice=192000, falling_for_the_enigma=192000 (both >1000). (3) All 32 have coverUrl; 6 spot-checked covers (burn_notice, s01, s10, s13, s20, s30) all return HTTP 200. (4) POST /api/endings/record burn_notice:burn_burn returns ok/rarityPercent(int)/endingUnlockTimes with the fresh key. (5) POST /api/endings/share increments shareCount monotonically. (6) POST /api/analytics accepts share_card_shared event with props (200). Frontend 6/6 flows verified via Playwright at 390x844 as test1@delulu.dev: (a) Home dedupe — hero=falling_for_the_enigma, featured=[s20,s13,s02,s01,burn_notice,s30] (6), continue=[] (0), story-cards=25 (s03..s29 minus featured); ZERO duplicates across buckets. (b) Gems — claim CTA exactly 'claim my daily delulu', no 'mock/MOCK/dev tap/Play Billing' text anywhere, no currency-picker-btn, currency-display present, exactly 1 day-cell-today, pack `best` shows 'Best Value / 1.2k gems / $9.99' (pluralize working). (c) Search — 32 cards, cover aspect ratio 160.44/241.66=0.6636 (target 2/3=0.6667, delta<0.5%), every card has caption BELOW image with title+genre (not overlaid). (d) Library empty state contains 'villain origin story'. (e) Profile — badge 'Certified Delulu' (in allowed set), NOT 'Lore Seeker'; streak card renders '0 days' without ellipsis/clip. (f) Reader coach — with delulu.reader.coachSeen.v1 cleared, /reader/burn_notice?chapter=0 shows reader-coach-overlay containing 'tap anywhere to keep the drama going'; after tap the flag is set to '1' and after reload the overlay is NOT re-rendered. Logout confirm dialog is invoked via RN Alert.alert which is a no-op on RN Web (no window.confirm, no role=dialog, no page-level `dialog` event) — per the request this check was skipped. Code inspection confirms VOICE.logoutConfirmBody='the cliffhangers will wait. they always do.' is wired into Alert.alert in profile.tsx:73-85, so on native builds the dialog will contain the required phrase.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "profile.tsx logout Alert.alert", "issue": "Alert.alert has no default RN-Web implementation, so on the web preview the logout confirm modal does not appear at all (button tap is a no-op). Native builds are fine. Consider a cross-platform confirm (Modal on web) if web is a first-class surface. Reference: app/(tabs)/profile.tsx:73-85"},
+      {"component": "TouchableWithoutFeedback (reader)", "issue": "Console warning: 'TouchableWithoutFeedback is deprecated. Please use Pressable.' Reference: app/reader/[id].tsx:243"},
+      {"component": "shadow*/textShadow*/pointerEvents style props", "issue": "Multiple RN-Web deprecation warnings across the app: 'shadow* style props are deprecated, use boxShadow', 'textShadow* deprecated, use textShadow', 'props.pointerEvents deprecated, use style.pointerEvents'. Non-blocking but should be migrated."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter5_v11_phaseA.py",
+    "/app/test_reports/pytest/pytest_iter5.xml"
+  ],
+  "action_items": [
+    "Optional: replace Alert.alert on the web target with a cross-platform confirm (e.g. Modal or window.confirm) so the logout confirmation actually renders in the web preview. Native builds already show the correct text.",
+    "Optional: migrate TouchableWithoutFeedback in reader to Pressable, and address the shadow*/textShadow*/pointerEvents deprecation warnings."
+  ],
+  "critical_code_review_comments": [
+    "backend catalog reseed is correct: /api/stories returns exactly 32 docs, seedReads is int and >0 for every doc, both flagship stories seedReads>1000, coverUrl is 200 on every spot-check.",
+    "record_ending() and share_ending() still behave post-reseed (rarityPercent + endingUnlockTimes on record; monotonic shareCount on share; analytics_events row inserted for share_card_shared).",
+    "home.tsx dedupe pipeline is working: hero picks flagship (falling_for_the_enigma), featured rail excludes hero, and the genre `all` rail excludes both — no id collision observed in DOM.",
+    "gems.tsx: mock language and currency picker have been fully removed from the visible surface; display-only currency-display chip is present; pluralize renders '1.2k gems' correctly for pack.gems=1200.",
+    "search.tsx: title/genre caption is rendered in a separate region below the cover (search-result-<id>), aspect ratio ≈ 2:3."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter5_v11_phaseA.py (new, 15 tests, all passing)"
+  ],
+  "success_rate": {"backend": "100% (15/15 iter5)", "frontend": "100% of observable checks (6/6); logout dialog skipped per request — Alert.alert unobservable on RN-Web"},
+  "seed_data_creation": "None. Used the existing seeded test1@delulu.dev. The endings/record test does re-record burn_notice:burn_burn which is already owned by this user — refresh of endingUnlockTimes is idempotent by design.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Delulu V1.1 Phase A ship is regression-clean. Backend endpoints validated: GET /api/stories (32 docs, no legacy, seedReads int>0, coverUrl 200), POST /api/endings/record, POST /api/endings/share, POST /api/analytics (share_card_shared). Frontend flows validated at 390x844: home dedupe, gems (claim CTA + no mock + no picker + today cell + pack pluralize), search (aspect 2:3 + caption below cover), library empty copy, profile reader-title (`Certified Delulu`, not Lore Seeker) + streak `0 days`, reader coach (overlay + localStorage delulu.reader.coachSeen.v1 gate). Only intentional gap: logout Alert.alert is unobservable on RN Web — this is an RN Web limitation and the request said to skip if not observable."
+}

@@ -200,3 +200,239 @@ share_card_shared analytics event when the share sheet closes.
 ## agent_communication:
     -agent: "main"
     -message: "Shipped 5 additive tasks on top of the existing MVP. Please verify: (a) /api/endings/share increments endingShareCounts and logs a share_card_shared event in db.analytics_events; (b) /api/endings/record now also writes endingUnlockTimes; (c) /api/stories returns ~35 stories including 30 s01-s30 catalog entries; (d) /api/stories/burn_notice.coverUrl points to the newly generated cover_burn_notice.png; (e) new Ending Wall UI shows the X/Y progress ring, and the banner rotates every ~4s between YOUR RAREST / JUST UNLOCKED / MOST SHARED (only when at least one share has happened); (f) Profile row 'ending wall' shows the 3/6 gold ring. Test credentials: test1@delulu.dev / delulu123 (user already has 3 recorded endings and 2 share counts from seed testing)."
+
+## user_problem_statement:
+DELULU V1.1 — PHASE A. Delete placeholder seeds, import 30 catalog stories with UNIQUE covers via Nano Banana; hide read counts under 1000; use seeded starting counts. UI/UX: home dedupe (continue > hero > rails), remove dev/mock copy from gems, remove currency selector (display-only), plural helper for days/gems/reads/chapters, daily-gems calendar with distinct claimed/today/future states, delulu-voice copy pass (empty library, claim CTA, logout confirm), profile fix (unclipped streak + dynamic reader title), search 2:3 cards with caption outside image, reader one-time coach overlay.
+
+## backend:
+  - task: "Catalog-only story roster with unique covers + seedReads"
+    implemented: true
+    working: true
+    file: "/app/backend/seed_data.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "seed_all now purges legacy stubs (the_last_signal/midnight_house/understudy) and merges all 30 catalog stories with per-story cover URLs (cover_sNN.png via manifest.covers). Each story now carries `seedReads` derived from a deterministic hash of the id — flagships 60k-150k, non-flagships 1.2k-24k. All 30 catalog covers regenerated via Nano Banana (unique per story)."
+
+  - task: "generate_assets.py --only catalog batch"
+    implemented: true
+    working: true
+    file: "/app/backend/generate_assets.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "New gen_catalog_covers() reads delulu_catalog.json and produces one unique cover per story with genre-specific art direction (romance/thriller/horror/scifi/drama palettes). Skips existing files unless --force. Verified 30/30 PNGs saved, all md5-unique."
+
+## frontend:
+  - task: "Plural helper + hide-below-1000 read counts"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/utils/format.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "New pluralize(count, singular, plural?), formatCount, formatReadCount helpers. Read count below 1000 returns null and the caller hides the badge. Used in home hero + featured, story detail meta, gems packs, profile streak card, home continue-reading."
+
+  - task: "Home dedupe (continue > hero > featured > rails)"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/home.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Explicit priority pipeline: continue-reading claims ids first, hero picks best unstarted flagship, featured rail sorts remaining by flagship-first + seedReads (cap 6), genre rails render whatever is left. No story can appear in more than one module."
+
+  - task: "Gems screen: no dev copy, no currency selector, pluralize, calendar states"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/gems.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Full rewrite. Removed the 'mock service' section note and the 'MOCK PurchaseService' legal footer. Removed the currency picker modal — currency is inferred at load-time from device locale and shown as a small read-only chip. Daily calendar is now a `DayCell` component with three visual states (claimed=filled flame + romance tint, today=dashed gold outline + pulse animation, future=dim outline). Claim button disabled once today is claimed and label switches to 'back tomorrow ✨'. Pack gem counts pluralized ('1.2k gems', '80 gems')."
+
+  - task: "Profile: unclipped streak card + dynamic reader title + logout confirm"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/profile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Streak card gets minHeight, includeFontPadding:false, lineHeight, numberOfLines=1 to prevent clipping. 'Lore Seeker' placeholder replaced by a dynamic reader title (getReaderTitle in theme.js) that upgrades from Delulu Rookie → Certified Delulu → Terminally Delulu → Delulu Royalty at 0/1/3/5 stories finished (distinct storyIds with an unlocked ending). Logout now confirms via a native Alert with delulu-voice copy ('leaving? the cliffhangers will wait. they always do.')."
+
+  - task: "Search: uniform 2:3 cards with caption outside image"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/search.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Cover is aspect-ratio: 2/3, image fills with resizeMode='cover'. Title/genre now sit BELOW the image on a caption line so text never overlaps a face. Small genre initial chip in the top-left, SOON pill top-right when applicable."
+
+  - task: "Reader: one-time coach overlay"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/reader/[id].tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "First open of any reader shows a full-screen tap-to-dismiss overlay with the message 'tap anywhere to keep the drama going. we'll auto-play the rest.' Persistence key delulu.reader.coachSeen.v1 (AsyncStorage). Fires analytics event `reader_coach_dismissed`. Verified via screenshot: overlay appears once, dismiss persists across reload."
+
+  - task: "Delulu-voice system copy pass"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/theme.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "New VOICE tokens: emptyLibrary ('no stories yet? that's your villain origin story.'), emptyLibraryCta, claimCTA ('claim my daily delulu'), claimBusy, claimAlready, logoutConfirmTitle/Body/Yes/No, endingsEmpty/Cta, coachFirstChapter/Dismiss. All screens updated to consume these tokens."
+
+## metadata:
+  created_by: "main_agent"
+  version: "1.1-phaseA"
+  test_sequence: 5
+
+## test_plan:
+  current_focus:
+    - "Catalog-only story roster with unique covers + seedReads"
+    - "Home dedupe (continue > hero > featured > rails)"
+    - "Gems screen: no dev copy, no currency selector, pluralize, calendar states"
+    - "Profile: unclipped streak card + dynamic reader title + logout confirm"
+    - "Search: uniform 2:3 cards with caption outside image"
+    - "Reader: one-time coach overlay"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+## agent_communication:
+    -agent: "main"
+    -message: "V1.1 Phase A shipped. Please verify: (a) GET /api/stories returns exactly 32 stories: 2 hand-authored flagships + 30 catalog (s01–s30). No legacy stubs (the_last_signal, midnight_house, understudy) exist. (b) Every catalog story has seedReads > 0 and a coverUrl matching /api/media/cover_sNN.png that returns 200. (c) Read counts <1000 must not display anywhere (helper returns null). Frontend: home dedupe (a story appears in ONE module only), gems currency picker removed, mock copy removed, daily calendar has three distinct visual states, streak card unclipped, reader coach appears once and persists dismissal, search cards are uniform 2:3 with caption outside image. Test creds: test1@delulu.dev / delulu123."
+
+## user_problem_statement:
+Phase B — Identity-aware story engine. Onboarding steps A (playerGender) + B (romancePreference)
+sitting after avatar step, editable from Profile > my identity. Pronoun token engine ({p_they},
+{c_<charId>_they}, sentence-start auto-cap). Love-interest variants (masc/femme). Casting on
+story start (with picker card for `everyone` preference). Full admin panel (validator + preview
+mode). Analytics: identity_set, li_cast_selected, story_complete casting.
+
+## backend:
+  - task: "Identity endpoints (get + save) with analytics"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "GET /api/users/identity returns identity + storyCastings for reader hydration. POST /api/users/identity saves and fires analytics 'identity_set' with firstSave flag. Defaults female/men when nothing stored."
+
+  - task: "Story casting engine + /story/cast endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "cast_love_interests(story, preference, override) decides masc/femme per LI character. men→masc, women→femme, surprise→random, everyone→needs picker. POST /api/story/cast persists on user.storyCastings, fires 'li_cast_selected' per freshly cast character, idempotent. Verified with rian → femme when preference=women."
+
+  - task: "Token engine (backend) + validator + preview"
+    implemented: true
+    working: true
+    file: "/app/backend/token_engine.py, /app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "token_engine.py implements resolve_tokens(), lint_chapter_text(), validate_story(). Admin endpoints: GET /admin/stories, GET /admin/stories/{id}/validate, POST /admin/preview, POST /admin/character/regenerate-portrait (queue-only). Env-gated via X-Admin-Pass header (ADMIN_PASSWORD=delulu-admin-2026). Verified with a demo token {c_rian_they} in falling_for_the_enigma ch1 that resolves to 'He'/'She' based on casting. Sentence-start capitalization confirmed working."
+
+## frontend:
+  - task: "Identity screen (Steps A+B) + Profile 'my identity' row + router integration"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/identity.tsx, /app/frontend/app/index.tsx, /app/frontend/app/(tabs)/profile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "New /identity route reached in two modes: ?onboarding=1 (first-time after avatar step, skippable) and editable from Profile. Two-step wizard with FadeIn transitions, pink accents for gender, gold for romance. Router in /app/index.tsx redirects users without identitySetAt to /identity?onboarding=1 before landing on home. Profile row 'my identity' shows current summary and links to edit."
+
+  - task: "Reader token resolver + LI picker card"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/reader/[id].tsx, /app/frontend/src/utils/tokens.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Client mirror of the resolver in utils/tokens.js. Reader calls storyApi.cast on load, hydrates user from context so tokens resolve immediately. MessageBubble now applies resolveText() to message.text; choice card text similarly resolved. `LoveInterestPicker` bottom-sheet-style overlay appears when preference='everyone' — masc/femme thumbnails per LI, must confirm before Chapter 1 auto-plays."
+
+  - task: "Admin panel (gate + validator + preview)"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/admin.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Passphrase gate on /admin (memory-only, no persist). Lists all 32 stories with OK/BLOCK pill + errors/warnings. Tap a story → full findings + variant issues + preview mode. Preview mode picks gender + chapter and renders resolved chapter messages to verify no leaks."
+
+## metadata:
+  created_by: "main_agent"
+  version: "1.1-phaseB"
+  test_sequence: 6
+
+## test_plan:
+  current_focus:
+    - "Identity endpoints (get + save) with analytics"
+    - "Story casting engine + /story/cast endpoint"
+    - "Token engine (backend) + validator + preview"
+    - "Identity screen (Steps A+B) + Profile 'my identity' row + router integration"
+    - "Reader token resolver + LI picker card"
+    - "Admin panel (gate + validator + preview)"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+## agent_communication:
+    -agent: "main"
+    -message: "Phase B shipped. Focus areas: (1) GET/POST /api/users/identity, correct defaults for legacy users, identity_set analytics event on save. (2) POST /api/story/cast — idempotent, respects preference, override merges cleanly, fires li_cast_selected per freshly-cast char. (3) Admin endpoints require X-Admin-Pass header (env ADMIN_PASSWORD='delulu-admin-2026'). GET /admin/stories returns 32 with validator summaries. Preview endpoint accepts arbitrary gender+casting and resolves tokens. (4) Frontend: fresh user is routed /identity?onboarding=1 before /home; Profile row opens identity in edit mode; reader shows token-resolved text (verify c_rian_they in falling_for_the_enigma ch1 message 'slides a second glass' resolves to 'He/She' depending on cast); Admin gate accepts passphrase and shows story list. Test creds: test1@delulu.dev / delulu123 (identity currently female/men)."

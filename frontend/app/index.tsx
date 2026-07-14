@@ -21,6 +21,12 @@ export default function Index() {
       router.replace("/avatar-builder");
       return;
     }
+    // Phase B: identity picker sits AFTER the avatar step. Users who never
+    // saved their identity are routed there once before hitting home.
+    if (!user.identitySetAt) {
+      router.replace("/identity?onboarding=1");
+      return;
+    }
     router.replace("/(tabs)/home");
   }, [loading, user, router]);
 
