@@ -935,7 +935,10 @@ class AdminPreviewIn(BaseModel):
 @api.post("/admin/preview")
 async def admin_preview(body: AdminPreviewIn, request: Request):
     """Render a chapter with tokens resolved for an arbitrary identity + casting.
-    Powers the admin "preview any identity" mode."""
+    Powers the admin "preview any identity" mode. If no castings are supplied
+    for a character that has variants, we auto-cast them based on
+    playerGender so preview prose reads cleanly (e.g. female→masc as the classic
+    het romance default). Reviewers can then override individually."""
     _require_admin(request)
     from token_engine import resolve_tokens
     story = await db.stories.find_one({"id": body.storyId}, {"_id": 0})
@@ -946,14 +949,24 @@ async def admin_preview(body: AdminPreviewIn, request: Request):
         raise HTTPException(status_code=400, detail="chapter index out of range")
     chapter = chapters[body.chapterIndex]
     player = {"gender": body.playerGender, "name": body.playerName}
+    # Fill castings so no LI with variants defaults to they/them (which breaks
+    # subject-verb agreement in author prose). Rule mirrors the client: female→masc,
+    # male→femme, nonbinary→masc as an arbitrary but consistent choice.
+    default_variant = {"female": "masc", "male": "femme", "nonbinary": "masc"}[body.playerGender]
+    resolved_castings = dict(body.castings or {})
+    for c in story.get("characters", []) or []:
+        v = c.get("variants") or {}
+        if v.get("masc") and v.get("femme") and c.get("id") and c["id"] not in resolved_castings:
+            resolved_castings[c["id"]] = default_variant
+
     resolved_messages = []
     for msg in chapter.get("messages") or []:
         m = dict(msg)
-        m["text"] = resolve_tokens(msg.get("text", ""), player, story.get("characters"), body.castings)
+        m["text"] = resolve_tokens(msg.get("text", ""), player, story.get("characters"), resolved_castings)
         if msg.get("choicePoint"):
             cp = dict(msg["choicePoint"])
             cp["options"] = [
-                {**opt, "text": resolve_tokens(opt.get("text", ""), player, story.get("characters"), body.castings)}
+                {**opt, "text": resolve_tokens(opt.get("text", ""), player, story.get("characters"), resolved_castings)}
                 for opt in cp.get("options") or []
             ]
             m["choicePoint"] = cp
@@ -961,7 +974,7 @@ async def admin_preview(body: AdminPreviewIn, request: Request):
     return {
         "storyId": body.storyId,
         "chapter": {**chapter, "messages": resolved_messages},
-        "castings": body.castings or {},
+        "castings": resolved_castings,
         "player": player,
     }
 

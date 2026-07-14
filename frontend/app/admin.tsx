@@ -182,6 +182,34 @@ export default function AdminHome() {
               </TouchableOpacity>
             </View>
 
+            {/* Per-character variant casting — surfaces every LI with variants so
+                the reviewer can toggle between masc/femme and instantly re-render.
+                Without this, preview defaulted to `they/them` fallbacks which
+                break subject-verb agreement in prose like "They slides…". */}
+            {details.characters?.length > 0 && (
+              <View style={styles.variantBar}>
+                <Text style={styles.variantBarLabel}>casting</Text>
+                {details.characters.filter((c) => c.hasVariants).map((c) => (
+                  <View key={c.id} style={styles.variantChipGroup}>
+                    <Text style={styles.variantCharName}>{c.name || c.id}</Text>
+                    {["masc", "femme"].map((v) => {
+                      const active = (previewParams.castings || {})[c.id] === v;
+                      return (
+                        <TouchableOpacity
+                          key={v}
+                          testID={`admin-preview-cast-${c.id}-${v}`}
+                          onPress={() => setPreviewParams((p) => ({ ...p, castings: { ...(p.castings || {}), [c.id]: v } }))}
+                          style={[styles.previewChip, active && { backgroundColor: COLORS.gemGold, borderColor: COLORS.gemGold }]}
+                        >
+                          <Text style={[styles.previewChipText, active && { color: COLORS.bg, fontWeight: "900" }]}>{v}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            )}
+
             {preview && (
               <View style={styles.previewBox}>
                 <Text style={styles.previewMeta}>chapter #{preview.chapter?.index || 0}: {preview.chapter?.title || "-"}</Text>
@@ -231,10 +259,14 @@ const styles = StyleSheet.create({
   findingMeta: { color: COLORS.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
   findingMsg: { color: COLORS.text, fontSize: 13 },
   findingSnippet: { color: COLORS.secondary, fontSize: 11, fontStyle: "italic" },
-  previewBar: { flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 8 },
+  previewBar: { flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" },
   previewChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   previewChipText: { color: COLORS.text, fontWeight: "700", fontSize: 11 },
   chapInput: { width: 44, padding: 6, borderRadius: RADIUS.sm, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.border, color: COLORS.text, textAlign: "center" },
+  variantBar: { marginTop: 4, padding: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
+  variantBarLabel: { color: COLORS.secondary, fontSize: 10, fontWeight: "900", letterSpacing: 1.5, textTransform: "uppercase" },
+  variantChipGroup: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  variantCharName: { color: COLORS.text, fontWeight: "800", fontSize: 12, marginRight: 4 },
   previewBox: { padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.bg, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
   previewMeta: { color: COLORS.gemGold, fontSize: 11, fontWeight: "900", letterSpacing: 0.4 },
   previewMsg: { paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border },

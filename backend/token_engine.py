@@ -258,6 +258,18 @@ def validate_story(story: Dict) -> Dict:
 
     error_count = sum(1 for f in findings + variant_issues if f.get("severity") == "error")
     warning_count = sum(1 for f in findings + variant_issues if f.get("severity") == "warning")
+    # Compact character summary for the admin panel — powers the per-character
+    # variant caster in preview mode.
+    char_summary = [
+        {
+            "id": c.get("id"),
+            "name": c.get("name"),
+            "role": c.get("role"),
+            "isLoveInterest": bool(c.get("isLoveInterest")),
+            "hasVariants": bool((c.get("variants") or {}).get("masc") and (c.get("variants") or {}).get("femme")),
+        }
+        for c in (story.get("characters") or [])
+    ]
     return {
         "storyId": story.get("id"),
         "canGoLive": error_count == 0,
@@ -265,4 +277,5 @@ def validate_story(story: Dict) -> Dict:
         "warnings": warning_count,
         "findings": findings,
         "variantIssues": variant_issues,
+        "characters": char_summary,
     }
