@@ -161,7 +161,7 @@ def build_story():
         "id": "ch1",
         "index": 0,
         "title": "A Chance Encounter",
-        "endChat": {"characterId": "rian", "prompt": "text him back?"},
+        "endChat": {"characterId": "rian", "prompt": "text {c_rian_them} back?"},
         "messages": [
             m("c1m1", "narrator", "Rooftop bar. Rain misting the neon. You didn't come here to meet anyone.", 1200, "neutral", "small"),
             m("c1m2", "rian", "You lost?", 1500, "neutral", "small"),
@@ -177,7 +177,7 @@ def build_story():
                     {"text": "Stay standing. Sip anyway.", "isPremium": False, "gemCost": 0, "nextMessageId": "c1m9b", "endingWeight": {"safe": 1}},
                 ]
             }),
-            m("c1m9a", "rian", "There she is.", 1200, "flirty", "small"),
+            m("c1m9a", "rian", "There {p_they} is.", 1200, "flirty", "small"),
             m("c1m9b", "rian", "You're still standing here.", 1300, "flirty", "small"),
         ],
     })
@@ -203,7 +203,7 @@ def build_story():
         "id": "ch3",
         "index": 2,
         "title": "Lines We Don't Cross",
-        "endChat": {"characterId": "rian", "prompt": "double text him?"},
+        "endChat": {"characterId": "rian", "prompt": "double text {c_rian_them}?"},
         "messages": [
             m("c3m1", "rian", "Meet me. Tonight. Same roof.", 1400, "flirty", "large"),
             m("c3m2", "PLAYER", "I have work.", 800, "neutral", "small"),
@@ -225,7 +225,7 @@ def build_story():
 
     # ── Chapters 4-9: Slow burn beats ────────────────────────────────────
     ch4_msgs = [
-        m("c4m1", "narrator", "Rooftop. 9:03 PM. He's already there.", 1200, "neutral", "small",
+        m("c4m1", "narrator", "Rooftop. 9:03 PM. {c_rian_they}'s already there.", 1200, "neutral", "small",
           panel={"imageUrl": SCENE_PANEL_ROOFTOP, "caption": "9:03 PM — the roof is his.", "isEndingPanel": False}),
         m("c4m2", "rian", "You came.", 1200, "happy", "large"),
         m("c4m3", "PLAYER", "", 500, "neutral", "small", choice={
@@ -238,19 +238,19 @@ def build_story():
         m("c4m4b", "rian", "Say that again. Slower.", 1400, "flirty", "large"),
     ]
     chapters.append({"id": "ch4", "index": 3, "title": "The First Crack",
-                     "endChat": {"characterId": "rian", "prompt": "let him in?"},
+                     "endChat": {"characterId": "rian", "prompt": "let {c_rian_them} in?"},
                      "messages": ch4_msgs})
 
     chapters.append({"id": "ch5", "index": 4, "title": "Names You Shouldn't Say",
         "endChat": {"characterId": "karan", "prompt": "hear Karan out?"},
         "messages": [
-        m("c5m1", "karan", "we need to talk about him.", 1000, "angry", "small"),
+        m("c5m1", "karan", "we need to talk about {c_rian_them}.", 1000, "angry", "small"),
         m("c5m2", "PLAYER", "no we don't.", 800, "angry", "small"),
-        m("c5m3", "karan", "he burns everything he touches.", 1400, "sad", "large"),
+        m("c5m3", "karan", "{c_rian_they} burns everything {c_rian_they} touches.", 1400, "sad", "large"),
         m("c5m4", "PLAYER", "", 500, "neutral", "small", choice={
             "options": [
                 {"text": "Tell me what you know.", "isPremium": False, "gemCost": 0, "nextMessageId": "c5m5a", "endingWeight": {"safe": 2}},
-                {"text": "You don't know him.", "isPremium": False, "gemCost": 0, "nextMessageId": "c5m5b", "endingWeight": {"bold": 1}},
+                {"text": "You don't know {c_rian_them}.", "isPremium": False, "gemCost": 0, "nextMessageId": "c5m5b", "endingWeight": {"bold": 1}},
                 {"text": "Meet me in person.", "isPremium": True, "gemCost": 25, "nextMessageId": "c5m5c", "endingWeight": {"delulu": 1}},
             ]
         }),
@@ -287,12 +287,12 @@ def build_story():
         "endChat": {"characterId": "meera", "prompt": "vent to Meera?"},
         "messages": [
         m("c8m1", "rian", "You told KARAN?", 1000, "angry", "large"),
-        m("c8m2", "PLAYER", "he asked.", 800, "sad", "small"),
-        m("c8m3", "rian", "of course he did.", 1200, "angry", "small", sfx="SLAM"),
+        m("c8m2", "PLAYER", "{c_karan_they} asked.", 800, "sad", "small"),
+        m("c8m3", "rian", "of course {c_karan_they} did.", 1200, "angry", "small", sfx="SLAM"),
     ]})
 
     chapters.append({"id": "ch9", "index": 8, "title": "Come Back",
-        "endChat": {"characterId": "rian", "prompt": "hear him out?"},
+        "endChat": {"characterId": "rian", "prompt": "hear {c_rian_them} out?"},
         "messages": [
         m("c9m1", "rian", "i'm sorry.", 900, "sad", "small"),
         m("c9m2", "rian", "i shouldn't have raised my voice.", 1200, "sad", "small"),
@@ -339,8 +339,8 @@ def build_story():
                 "femme": {"name": "Riana Aster", "avatarUrl": MEERA_PORTRAITS["neutral"], "portraitUrls": MEERA_PORTRAITS, "bio": "cold heiress with a rooftop obsession"},
             },
         },
-        {"id": "meera", "name": "Meera",         "role": "Best Friend", "avatarUrl": MEERA_PORTRAITS["neutral"], "portraitUrls": MEERA_PORTRAITS},
-        {"id": "karan", "name": "Karan",         "role": "Rival",       "avatarUrl": KARAN_PORTRAITS["neutral"], "portraitUrls": KARAN_PORTRAITS},
+        {"id": "meera", "name": "Meera",         "role": "Best Friend", "gender": "female", "avatarUrl": MEERA_PORTRAITS["neutral"], "portraitUrls": MEERA_PORTRAITS},
+        {"id": "karan", "name": "Karan",         "role": "Rival",       "gender": "male",   "avatarUrl": KARAN_PORTRAITS["neutral"], "portraitUrls": KARAN_PORTRAITS},
         {"id": "narrator", "name": "Narrator",   "role": "narration",   "avatarUrl": None, "portraitUrls": {}},
     ]
 
@@ -383,13 +383,13 @@ def build_story_burn_notice():
             m("b1m6a", "karan", "look at the window. across the street. i just closed the blinds.", 1800, "neutral", "large"),
             m("b1m6b", "karan", "you won't. and we both know it.", 1500, "neutral", "small"),
         ]},
-        {"id": "b2", "index": 1, "title": "The Photograph", "endChat": {"characterId": "karan", "prompt": "ask what he knows?"}, "messages": [
+        {"id": "b2", "index": 1, "title": "The Photograph", "endChat": {"characterId": "karan", "prompt": "ask what {c_karan_they} knows?"}, "messages": [
             m("b2m1", "karan", "check your mailbox. i left something.", 1200, "neutral", "small"),
             m("b2m2", "narrator", "One photo. You. At last week's gallery. You'd told no one you went.", 1600, "neutral", "small", sfx="!!!"),
             m("b2m3", "PLAYER", "how did you get this?", 900, "shocked", "small"),
             m("b2m4", "karan", "same way HE did. only i'm on your side.", 1500, "neutral", "large"),
         ]},
-        {"id": "b3", "index": 2, "title": "The Setup", "endChat": {"characterId": "karan", "prompt": "trust him?"}, "messages": [
+        {"id": "b3", "index": 2, "title": "The Setup", "endChat": {"characterId": "karan", "prompt": "trust {c_karan_them}?"}, "messages": [
             m("b3m1", "karan", "meet me. tonight. rooftop of the concordia.", 1400, "neutral", "large"),
             m("b3m2", "PLAYER", "", 500, "neutral", "small", choice={
                 "options": [
