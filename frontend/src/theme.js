@@ -57,7 +57,8 @@ export const TYPO = {
 // Brand voice copy
 export const VOICE = {
   loading: "manifesting...",
-  emptyLibrary: "it's giving... nothing. let's find you a story.",
+  emptyLibrary: "no stories yet? that's your villain origin story.",
+  emptyLibraryCta: "find your obsession",
   emptyCloset: "you can't romance the lead in THAT fit",
   timer: "patience isn't very delulu of you...",
   timerSkip: "15 gems says otherwise",
@@ -66,4 +67,37 @@ export const VOICE = {
   endingRareTemplate: (pct) => `only ${pct}% of readers were delulu enough to get this ending`,
   streakClaimed: "streak secured. delulu certified.",
   needAvatar: "before we spiral together, you need a face",
+  // Daily claim
+  claimCTA: "claim my daily delulu",
+  claimBusy: "claiming...",
+  claimAlready: "already claimed today. it's giving loyalty.",
+  // Logout
+  logoutConfirmTitle: "leaving?",
+  logoutConfirmBody: "the cliffhangers will wait. they always do.",
+  logoutConfirmYes: "log out anyway",
+  logoutConfirmNo: "stay delulu",
+  // Endings wall
+  endingsEmpty: "no endings yet. finish a story to start collecting.",
+  endingsEmptyCta: "find your first spiral",
+  // Reader coach
+  coachFirstChapter: "tap anywhere to keep the drama going. we'll auto-play the rest.",
+  coachDismiss: "got it",
 };
+
+// Reader-title system — upgrades with stories completed. Ordered by threshold ascending.
+// The first entry that the user meets from the END of the list wins.
+export const READER_TITLES = [
+  { threshold: 0, label: "Delulu Rookie",     accent: "#9B9BA8" },
+  { threshold: 1, label: "Certified Delulu",  accent: "#FF3E8A" },
+  { threshold: 3, label: "Terminally Delulu", accent: "#7C5CFF" },
+  { threshold: 5, label: "Delulu Royalty",    accent: "#FFC94A" },
+];
+
+export function getReaderTitle(storiesCompleted) {
+  const n = Math.max(0, Number(storiesCompleted) || 0);
+  let match = READER_TITLES[0];
+  for (const t of READER_TITLES) {
+    if (n >= t.threshold) match = t;
+  }
+  return match;
+}

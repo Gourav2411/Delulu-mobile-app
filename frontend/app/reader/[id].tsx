@@ -19,6 +19,10 @@ import { AvatarPreview } from "@/src/AvatarPreview";
 import ChatWithCharacterSheet from "@/src/ChatWithCharacterSheet";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
+import { storage } from "@/src/utils/storage";
+
+// Persisted flag: has the user seen the reader coach overlay at least once?
+const COACH_SEEN_KEY = "delulu.reader.coachSeen.v1";
 
 export default function Reader() {
   const router = useRouter();
@@ -35,8 +39,25 @@ export default function Reader() {
   const [loading, setLoading] = useState(true);
   const [complete, setComplete] = useState(false);
   const [chatSheet, setChatSheet] = useState(false);
+  const [showCoach, setShowCoach] = useState(false); // one-time reader coach overlay
   const scrollRef = useRef(null);
   const activeCharRef = useRef({ id: null, expression: "neutral" });
+
+  // First-ever chapter → show a one-time coach mark explaining the auto-play flow.
+  // The overlay dismisses on tap and never blocks reading progression again.
+  useEffect(() => {
+    (async () => {
+      const seen = await storage.getItem(COACH_SEEN_KEY, null);
+      if (!seen) setShowCoach(true);
+    })();
+  }, []);
+
+  const dismissCoach = useCallback(async () => {
+    setShowCoach(false);
+    try { await storage.setItem(COACH_SEEN_KEY, "1"); } catch {}
+    Haptics.selectionAsync();
+    analyticsApi.track("reader_coach_dismissed", {});
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -331,6 +352,24 @@ export default function Reader() {
           }
         />
       )}
+
+      {/* First-run reader coach mark — dismiss on any tap */}
+      {showCoach && (
+        <TouchableWithoutFeedback onPress={dismissCoach}>
+          <View style={styles.coachOverlay} testID="reader-coach-overlay">
+            <View style={styles.coachCard}>
+              <View style={styles.coachIconWrap}>
+                <Ionicons name="hand-left" size={26} color={COLORS.gemGold} />
+              </View>
+              <Text style={styles.coachTitle}>welcome to the drama</Text>
+              <Text style={styles.coachBody}>{VOICE.coachFirstChapter}</Text>
+              <View style={styles.coachCta}>
+                <Text style={styles.coachCtaText}>{VOICE.coachDismiss}</Text>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      )}
     </View>
   );
 }
@@ -492,4 +531,12 @@ const styles = StyleSheet.create({
   gemPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: "rgba(255,201,74,0.15)", borderWidth: 1, borderColor: COLORS.gemGold },
   gemDotSm: { width: 8, height: 8, backgroundColor: COLORS.gemGold, transform: [{ rotate: "45deg" }] },
   gemPillText: { color: COLORS.gemGold, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  // Reader coach overlay
+  coachOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(10,10,15,0.72)", alignItems: "center", justifyContent: "center", padding: SPACING.xl, zIndex: 999 },
+  coachCard: { width: "100%", maxWidth: 320, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gemGold, padding: SPACING.lg, gap: 10, alignItems: "center", shadowColor: COLORS.gemGold, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 20 },
+  coachIconWrap: { width: 56, height: 56, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: `${COLORS.gemGold}22`, borderWidth: 1, borderColor: COLORS.gemGold },
+  coachTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900", letterSpacing: -0.4, marginTop: 4 },
+  coachBody: { color: COLORS.secondary, fontSize: 13, textAlign: "center", lineHeight: 18 },
+  coachCta: { marginTop: 6, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: COLORS.gemGold, borderRadius: RADIUS.pill },
+  coachCtaText: { color: COLORS.bg, fontWeight: "900", fontSize: 13, letterSpacing: 0.3 },
 });

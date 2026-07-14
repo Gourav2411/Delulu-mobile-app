@@ -42,7 +42,7 @@ export default function Library() {
             <Ionicons name="book-outline" size={40} color={COLORS.secondary} />
             <Text style={styles.emptyText}>{VOICE.emptyLibrary}</Text>
             <TouchableOpacity onPress={() => router.push("/(tabs)/home")} style={styles.emptyCta}>
-              <Text style={styles.emptyCtaText}>find a story</Text>
+              <Text style={styles.emptyCtaText}>{VOICE.emptyLibraryCta}</Text>
             </TouchableOpacity>
           </View>
         ) : reading.map((s) => {

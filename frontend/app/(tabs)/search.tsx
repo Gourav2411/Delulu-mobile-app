@@ -77,9 +77,24 @@ export default function Search() {
             activeOpacity={0.85}
             style={styles.card}
           >
-            <Image source={{ uri: s.coverUrl }} style={StyleSheet.absoluteFillObject} />
-            <View style={styles.cardShade} />
-            <Text style={styles.cardTitle} numberOfLines={2}>{s.title}</Text>
+            {/* Cover with strict 2:3 aspect ratio — image fills, no text overlay */}
+            <View style={styles.cover}>
+              <Image source={{ uri: s.coverUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              {/* Small genre chip stays on the image (top-left, low visual weight) */}
+              <View style={[styles.genreChipOnCover, { backgroundColor: s.accentColor }]}>
+                <Text style={styles.genreChipText}>{s.genre?.[0]?.toUpperCase() || "?"}</Text>
+              </View>
+              {s.status === "coming_soon" && (
+                <View style={styles.soonPill}>
+                  <Text style={styles.soonText}>SOON</Text>
+                </View>
+              )}
+            </View>
+            {/* Caption line: title + genre outside the image */}
+            <View style={styles.caption}>
+              <Text style={styles.cardTitle} numberOfLines={2}>{s.title}</Text>
+              <Text style={styles.cardSub} numberOfLines={1}>{cap(s.genre)}</Text>
+            </View>
           </TouchableOpacity>
         ))}
         {filtered.length === 0 && (
@@ -89,6 +104,8 @@ export default function Search() {
     </View>
   );
 }
+
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
 
 const styles = StyleSheet.create({
   loading: { flex: 1, backgroundColor: COLORS.bg, alignItems: "center", justifyContent: "center" },
@@ -100,8 +117,15 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, gap: 8, alignItems: "center", height: 56 },
   chip: { flexShrink: 0, paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, height: 36, justifyContent: "center" },
   chipText: { color: COLORS.secondary, fontSize: 13, fontWeight: "700", textTransform: "capitalize" },
-  card: { width: "47.5%", aspectRatio: 0.72, borderRadius: RADIUS.md, overflow: "hidden", backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, justifyContent: "flex-end", padding: SPACING.sm },
-  cardShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(10,10,15,0.4)" },
-  cardTitle: { color: COLORS.text, fontWeight: "800", fontSize: 14, zIndex: 1 },
+  // Search-result card: uniform 2:3 cover, caption outside the image
+  card: { width: "47.5%", gap: 6 },
+  cover: { width: "100%", aspectRatio: 2 / 3, borderRadius: RADIUS.md, overflow: "hidden", backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, position: "relative" },
+  genreChipOnCover: { position: "absolute", top: 8, left: 8, width: 22, height: 22, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  genreChipText: { color: COLORS.bg, fontSize: 11, fontWeight: "900" },
+  soonPill: { position: "absolute", top: 8, right: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.sm, backgroundColor: "rgba(10,10,15,0.75)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  soonText: { color: COLORS.text, fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
+  caption: { paddingHorizontal: 2, gap: 2, minHeight: 42 },
+  cardTitle: { color: COLORS.text, fontWeight: "800", fontSize: 13, lineHeight: 16, letterSpacing: -0.1 },
+  cardSub: { color: COLORS.secondary, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   empty: { color: COLORS.secondary, textAlign: "center", padding: SPACING.xl, width: "100%" },
 });

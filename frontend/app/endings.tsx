@@ -217,9 +217,9 @@ export default function EndingWall() {
       {cards.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="ribbon-outline" size={48} color={COLORS.secondary} />
-          <Text style={styles.emptyText}>no endings yet.{"\n"}finish a story to start collecting.</Text>
+          <Text style={styles.emptyText}>{VOICE.endingsEmpty}</Text>
           <TouchableOpacity onPress={() => router.push("/(tabs)/home")} style={styles.emptyCta}>
-            <Text style={styles.emptyCtaText}>find a story</Text>
+            <Text style={styles.emptyCtaText}>{VOICE.endingsEmptyCta}</Text>
           </TouchableOpacity>
         </View>
       ) : (

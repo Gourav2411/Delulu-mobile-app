@@ -250,6 +250,128 @@ async def gen_cover(force=False):
     _save_manifest(manifest)
 
 
+# ---------------------------------------------------------------------------
+# Catalog covers — one unique cover per catalog story (s01..s30).
+# Prompts are built from the catalog's per-story synopsis + genre + trope tags
+# to guarantee no two covers reuse the same imagery. Same webtoon STYLE applied.
+# ---------------------------------------------------------------------------
+
+_CATALOG_PATH = Path(__file__).parent.parent / "memory" / "artifacts" / "delulu_catalog.json"
+
+# Genre-specific art direction — palette + mood + framing hints, layered on top
+# of STYLE so every genre still reads as one visual family.
+_GENRE_ART_DIRECTION = {
+    "romance": (
+        "Palette: hot magenta (#FF3E8A), deep wine, warm cream highlights, soft neon petals or dust. "
+        "Mood: charged intimacy, close-crop framing, one figure catching light on the cheekbone, "
+        "backlit halftone. Composition: single love-interest three-quarter portrait with dreamy "
+        "background bokeh, no on-cover text."
+    ),
+    "thriller": (
+        "Palette: electric cobalt (#3E9BFF) + noir black + one cold crimson accent for danger. "
+        "Mood: rain-slick city 3AM, hard shadows, silhouetted figures, screen-glow from a phone. "
+        "Composition: cinematic thriller film-poster, wide angle, secondary silhouette in the "
+        "background implying surveillance, no on-cover text."
+    ),
+    "horror": (
+        "Palette: sickly moon-green + cold rust red + deep charcoal, minimal saturation. "
+        "Mood: dread, negative space, wrongness — a figure half-hidden, a mirror or door slightly "
+        "ajar, one uncanny detail. Composition: unsettling asymmetry, framed like a horror manga "
+        "chapter cover, no on-cover text."
+    ),
+    "scifi": (
+        "Palette: iridescent violet (#7C5CFF) + cyan hologram highlights + starfield black. "
+        "Mood: technological awe + isolation, glowing HUD panels, faint scan lines. "
+        "Composition: figure framed by curved cockpit or corridor, holographic overlays partially "
+        "obscuring form, no on-cover text."
+    ),
+    "drama": (
+        "Palette: sunset orange (#FF8A3E) + smoky teal + soft gold highlight. "
+        "Mood: yearning, spotlit stage energy, one figure caught mid-decision. "
+        "Composition: theatrical single-portrait framing with a dramatic backdrop (stage, "
+        "backstage curtain, city rooftop), no on-cover text."
+    ),
+}
+
+
+def _catalog_cover_prompt(story):
+    """Build a unique cover prompt for a catalog story from its metadata."""
+    genre = (story.get("genre") or "drama").lower()
+    art = _GENRE_ART_DIRECTION.get(genre, _GENRE_ART_DIRECTION["drama"])
+    title = story.get("title", story.get("id"))
+    synopsis = (story.get("synopsis") or "")[:400]
+    tropes = ", ".join((story.get("tropeTags") or [])[:4])
+    # Grab the love-interest bio if available for stronger character grounding
+    li_bio = ""
+    for c in story.get("characters", []):
+        role = (c.get("role") or "").lower()
+        if "love interest" in role or c.get("isLoveInterest"):
+            li_bio = (c.get("bio") or "")[:220]
+            break
+    return (
+        f"{STYLE} {art} "
+        f"Book cover for a chat-fiction story titled \"{title}\". "
+        f"Genre: {genre}. Tropes: {tropes or 'n/a'}. "
+        f"Synopsis: {synopsis} "
+        f"{('Featured lead character: ' + li_bio + '. ') if li_bio else ''}"
+        f"Vertical portrait 3:4. Absolutely no title text, no letters, no logos, no watermarks."
+    )
+
+
+def _load_catalog_stories():
+    if not _CATALOG_PATH.exists():
+        return []
+    try:
+        return (json.loads(_CATALOG_PATH.read_text()) or {}).get("stories") or []
+    except Exception:
+        return []
+
+
+async def gen_catalog_covers(force=False):
+    """Generate one unique cover per catalog story (s01..s30).
+
+    Every filename is `cover_<story_id>.png`. Reruns skip already-generated files
+    unless `force=True`. Failures per story do NOT abort the batch — the manifest
+    only records the successful ones so seed_data.py can fall back gracefully.
+    """
+    stories = _load_catalog_stories()
+    if not stories:
+        print("[catalog covers] no catalog found, skipping")
+        return
+    manifest = _load_manifest()
+    manifest.setdefault("covers", {})
+    total = success = fail = skipped = 0
+    for story in stories:
+        sid = story.get("id")
+        if not sid:
+            continue
+        total += 1
+        filename = f"cover_{sid}.png"
+        out = MEDIA_DIR / filename
+        if out.exists() and not force:
+            manifest["covers"][sid] = filename
+            skipped += 1
+            print(f"  = skip (exists) {filename}")
+            _save_manifest(manifest)
+            continue
+        prompt = _catalog_cover_prompt(story)
+        print(f"→ generating {filename} for '{story.get('title')}' …")
+        ok = await _gen_one(prompt, out)
+        if ok:
+            manifest["covers"][sid] = filename
+            success += 1
+            print(f"  ✓ saved {filename}")
+        else:
+            fail += 1
+            print(f"  ✗ FAILED {filename}")
+        _save_manifest(manifest)
+        # Small breathing room between calls
+        await asyncio.sleep(0.6)
+    print(f"\ncatalog covers: {success} new / {skipped} skipped / {fail} failed / {total} total")
+
+
+
+
 async def main(only, force):
     if only in (None, "all", "char"):
         await gen_characters(force=force)
@@ -257,6 +379,8 @@ async def main(only, force):
         await gen_scenes(force=force)
     if only in (None, "all", "cover"):
         await gen_cover(force=force)
+    if only in (None, "all", "catalog"):
+        await gen_catalog_covers(force=force)
     manifest = _load_manifest()
     print("\nmanifest:")
     print(json.dumps(manifest, indent=2))
@@ -264,7 +388,7 @@ async def main(only, force):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", choices=["all", "char", "panels", "cover"], default="all")
+    ap.add_argument("--only", choices=["all", "char", "panels", "cover", "catalog"], default="all")
     ap.add_argument("--force", action="store_true", help="regenerate even if file exists")
     args = ap.parse_args()
     asyncio.run(main(args.only, args.force))

@@ -348,6 +348,7 @@ def build_story():
         "status": "live",
         "isFlagship": True,
         "ageRating": "16+",
+        "seedReads": 128_400,
         "totalReads": 63421,
     }
 
@@ -430,6 +431,7 @@ def build_story_burn_notice():
         "status": "live",
         "isFlagship": True,
         "ageRating": "16+",
+        "seedReads": 87_320,
         "totalReads": 12480,
     }
 
@@ -491,6 +493,10 @@ def _normalize_catalog_story(cat):
             "portraitUrls": {k: (v if str(v).startswith("http") else _generic_portrait)
                              for k, v in (c.get("portraitUrls") or {}).items()},
         })
+    # Seeded starting reads — deterministic per story so the number is stable
+    # across restarts. Flagships get bigger numbers; the rest get a
+    # trope-worthy 1.2k–24k range so the store never shows raw zeros.
+    seed_reads = _seed_read_count(cat.get("id"), bool(cat.get("isFlagship", False)))
     return {
         "id": cat["id"],
         "title": cat.get("title", cat["id"]),
@@ -506,8 +512,26 @@ def _normalize_catalog_story(cat):
         "status": status,
         "isFlagship": bool(cat.get("isFlagship", False)),
         "ageRating": cat.get("ageRating", "16+"),
+        "seedReads": seed_reads,
         "totalReads": int(cat.get("totalReads", 0)),
     }
+
+
+def _seed_read_count(story_id, is_flagship):
+    """Deterministic seeded starting read count based on the story id.
+    Flagships land in the 60k-150k range; the rest 1.2k-24k. Adds enough entropy
+    that no two stories share the same number without needing a full random.
+    """
+    if not story_id:
+        return 0
+    # Cheap deterministic hash
+    h = 0
+    for ch in story_id:
+        h = (h * 33 + ord(ch)) & 0xFFFF
+    if is_flagship:
+        return 60_000 + (h % 90_000)  # 60,000 – 149,999
+    # Non-flagship: 1,200 – 24,000
+    return 1_200 + (h % 22_800)
 
 
 # ============================================================================
@@ -544,33 +568,8 @@ async def seed_all(db):
             )
         print(f"[seed] catalog merged: {len(catalog['stories'])} stories (skipped {len(_LOCAL_STORY_IDS)} local)")
 
-    # Legacy coming-soon stubs — kept only if the catalog didn't already replace them
-    coming_soon_ids = {"the_last_signal", "midnight_house", "understudy"}
-    existing = {doc["id"] async for doc in db.stories.find({"id": {"$in": list(coming_soon_ids)}}, {"id": 1})}
-    coming_soon = []
-    if "the_last_signal" not in existing:
-        coming_soon.append({
-            "id": "the_last_signal", "title": "The Last Signal", "genre": "scifi", "accentColor": "#7C5CFF",
-            "coverUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1000&q=80",
-            "synopsis": "One transmission. Twelve survivors. And a voice that knows your name.",
-            "tropeTags": ["Space Horror", "Slow Burn"], "characters": [], "chapters": [], "endings": [],
-            "status": "coming_soon", "isFlagship": False, "totalReads": 0,
-        })
-    if "midnight_house" not in existing:
-        coming_soon.append({
-            "id": "midnight_house", "title": "The House on Midnight Row", "genre": "horror", "accentColor": "#E5273E",
-            "coverUrl": "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=1000&q=80",
-            "synopsis": "Every mirror in the house lies. Except one.",
-            "tropeTags": ["Haunted", "Mystery"], "characters": [], "chapters": [], "endings": [],
-            "status": "coming_soon", "isFlagship": False, "totalReads": 0,
-        })
-    if "understudy" not in existing:
-        coming_soon.append({
-            "id": "understudy", "title": "Understudy", "genre": "drama", "accentColor": "#FF8A3E",
-            "coverUrl": "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1000&q=80",
-            "synopsis": "The lead can't perform tonight. And you know exactly why.",
-            "tropeTags": ["Fame", "Rivalry"], "characters": [], "chapters": [], "endings": [],
-            "status": "coming_soon", "isFlagship": False, "totalReads": 0,
-        })
-    for s in coming_soon:
-        await db.stories.update_one({"id": s["id"]}, {"$set": s}, upsert=True)
+    # Purge legacy placeholder stubs from prior seeds — the real catalog replaces them
+    LEGACY_STUB_IDS = ["the_last_signal", "midnight_house", "understudy"]
+    result = await db.stories.delete_many({"id": {"$in": LEGACY_STUB_IDS}})
+    if result.deleted_count:
+        print(f"[seed] purged {result.deleted_count} legacy placeholder stubs")

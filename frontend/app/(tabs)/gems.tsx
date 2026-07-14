@@ -1,35 +1,27 @@
-// Gem store — daily claim + packs (mock IAP)
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal } from "react-native";
+// Gem store — daily claim + packs.
+// Prices come from the store's localized billing; UI is display-only.
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 import { gemsApi } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
 import { COLORS, RADIUS, SPACING, VOICE } from "@/src/theme";
 import { detectCurrency, formatPrice } from "@/src/currency";
-import { storage } from "@/src/utils/storage";
 import { useToast } from "@/src/Toast";
+import { pluralize } from "@/src/utils/format";
 
-const CURRENCY_KEY = "delulu.currency.override";
-const CURRENCIES = [
-  { code: "USD", label: "US Dollar", flag: "🇺🇸" },
-  { code: "INR", label: "Indian Rupee", flag: "🇮🇳" },
-  { code: "EUR", label: "Euro", flag: "🇪🇺" },
-  { code: "GBP", label: "British Pound", flag: "🇬🇧" },
-  { code: "AED", label: "UAE Dirham", flag: "🇦🇪" },
-  { code: "BRL", label: "Brazilian Real", flag: "🇧🇷" },
-  { code: "JPY", label: "Japanese Yen", flag: "🇯🇵" },
-  { code: "CAD", label: "Canadian Dollar", flag: "🇨🇦" },
-  { code: "AUD", label: "Australian Dollar", flag: "🇦🇺" },
-  { code: "SGD", label: "Singapore Dollar", flag: "🇸🇬" },
-  { code: "MXN", label: "Mexican Peso", flag: "🇲🇽" },
-  { code: "PHP", label: "Philippine Peso", flag: "🇵🇭" },
-  { code: "IDR", label: "Indonesian Rupiah", flag: "🇮🇩" },
-];
-
+// Days of the week — starts on Monday to match global streak conventions
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 export default function Gems() {
@@ -37,41 +29,32 @@ export default function Gems() {
   const { msg } = useLocalSearchParams();
   const toast = useToast();
   const [packs, setPacks] = useState([]);
-  const [currency, setCurrency] = useState("USD");
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(msg || null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Store the currency the backend used to price these packs (from IP / device
+  // locale). We only display it in a small footer chip — the user can't switch
+  // manually because real Play Billing / App Store handle regional pricing.
+  const currency = useRef(detectCurrency()).current;
 
-  const load = async (curCode) => {
+  const load = async () => {
     try {
-      const { packs } = await gemsApi.packs(curCode);
+      const { packs } = await gemsApi.packs(currency);
       setPacks(packs);
     } catch {}
   };
 
-  const changeCurrency = async (code) => {
-    Haptics.selectionAsync();
-    setCurrency(code);
-    setShowCurrencyPicker(false);
-    await storage.setItem(CURRENCY_KEY, code);
-    await load(code);
-    const cur = CURRENCIES.find((c) => c.code === code);
-    toast.show(`prices now in ${cur?.flag || ""} ${code}`, { icon: "cash" });
-  };
-
   useEffect(() => {
     (async () => {
-      const saved = await storage.getItem(CURRENCY_KEY, null);
-      const chosen = saved || detectCurrency();
-      setCurrency(chosen);
-      await load(chosen);
+      await load();
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const claim = async () => {
+    if (busy) return;
     setBusy(true);
     setNotice(null);
     try {
@@ -79,31 +62,50 @@ export default function Gems() {
       const res = await gemsApi.daily();
       await refresh();
       setNotice(`+${res.awarded} gems. ${VOICE.streakClaimed}`);
+      toast.show(`+${res.awarded} gems`, { icon: "flame" });
     } catch (e) {
-      setNotice(e.detail || "already claimed");
+      setNotice(e?.detail || VOICE.claimAlready);
     } finally {
       setBusy(false);
     }
   };
 
   const buy = async (packId) => {
+    if (busy) return;
     setBusy(true);
     setNotice(null);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       const res = await gemsApi.buyMock(packId);
       await refresh();
-      setNotice(`+${res.awarded} gems. dev tap — real Play Billing wires later.`);
+      setNotice(`+${res.awarded} gems. enjoy the spiral.`);
     } catch (e) {
-      setNotice(e.detail || "purchase failed");
+      setNotice(e?.detail || "purchase didn't go through, try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  const onRefresh = async () => { setRefreshing(true); await load(currency); await refresh(); setRefreshing(false); };
+  const onRefresh = async () => { setRefreshing(true); await load(); await refresh(); setRefreshing(false); };
 
   const streak = user?.streak ?? 0;
+  // Determine if today has already been claimed. Backend returns lastDailyClaim
+  // as an ISO datetime; if the calendar day matches "today" in the user's local
+  // tz, they've claimed today.
+  const claimedToday = (() => {
+    const last = user?.lastDailyClaim;
+    if (!last) return false;
+    const d = new Date(last);
+    if (Number.isNaN(d.getTime())) return false;
+    const today = new Date();
+    return d.getFullYear() === today.getFullYear()
+      && d.getMonth() === today.getMonth()
+      && d.getDate() === today.getDate();
+  })();
+  // Today's index in the streak row (0..6). If claimed today, "today" advances
+  // to the *next* day (dim/future). Otherwise it's the day the user should tap.
+  const todayIdx = claimedToday ? (streak % 7) : (streak % 7);
+  const daysClaimed = claimedToday ? (streak % 7) + 1 : (streak % 7);
 
   if (loading) return <View style={styles.loading}><ActivityIndicator color={COLORS.romance} /></View>;
 
@@ -138,44 +140,41 @@ export default function Gems() {
             <View style={styles.dailyGem}><View style={styles.gemBig} /><Text style={styles.dailyGemText}>+5</Text></View>
           </View>
           <View style={styles.streakRow}>
-            {DAYS.map((d, i) => {
-              const done = i < (streak % 7);
-              const today = i === (streak % 7);
-              return (
-                <View key={i} style={[styles.streakDay, done && { backgroundColor: `${COLORS.romance}22`, borderColor: COLORS.romance }, today && { backgroundColor: COLORS.romance, borderColor: COLORS.romance }]}>
-                  <Ionicons name={done || today ? "flame" : "flame-outline"} size={16} color={today ? COLORS.bg : done ? COLORS.romance : COLORS.secondary} />
-                  <Text style={[styles.streakDayLabel, today && { color: COLORS.bg }]}>{d}</Text>
-                </View>
-              );
-            })}
+            {DAYS.map((d, i) => (
+              <DayCell
+                key={i}
+                label={d}
+                state={i < daysClaimed ? "claimed" : i === todayIdx && !claimedToday ? "today" : "future"}
+              />
+            ))}
           </View>
           <TouchableOpacity
             testID="gems-daily-claim"
             onPress={claim}
-            disabled={busy}
+            disabled={busy || claimedToday}
             activeOpacity={0.9}
-            style={styles.claimBtn}
+            style={[styles.claimBtn, (busy || claimedToday) && { opacity: 0.5 }]}
           >
-            <Text style={styles.claimBtnText}>{busy ? "..." : "claim 5 gems"}</Text>
+            <Text style={styles.claimBtnText}>
+              {busy ? VOICE.claimBusy : claimedToday ? "back tomorrow ✨" : VOICE.claimCTA}
+            </Text>
           </TouchableOpacity>
+          {streak > 0 && (
+            <Text style={styles.streakLine}>
+              🔥 {pluralize(streak, "day")} in a row · keep it going
+            </Text>
+          )}
         </View>
 
         {/* Packs */}
         <View style={{ gap: SPACING.sm }}>
           <View style={styles.packsHead}>
             <Text style={styles.sectionHeader}>gem packs</Text>
-            <TouchableOpacity
-              testID="currency-picker-btn"
-              onPress={() => { Haptics.selectionAsync(); setShowCurrencyPicker(true); }}
-              activeOpacity={0.85}
-              style={styles.currencyChip}
-            >
-              <Ionicons name="globe-outline" size={14} color={COLORS.text} />
+            <View style={styles.currencyChip} testID="currency-display">
+              <Ionicons name="globe-outline" size={12} color={COLORS.secondary} />
               <Text style={styles.currencyChipText}>{currency}</Text>
-              <Ionicons name="chevron-down" size={14} color={COLORS.secondary} />
-            </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.sectionNote}>real Play Billing wires later — these use a mock service.</Text>
           {packs.map((p) => (
             <TouchableOpacity
               key={p.id}
@@ -193,7 +192,7 @@ export default function Gems() {
                 <Text style={styles.packLabel}>{p.label}</Text>
                 <View style={styles.packGems}>
                   <View style={styles.gemSmall} />
-                  <Text style={styles.packGemNum}>{p.gems}</Text>
+                  <Text style={styles.packGemNum}>{pluralize(p.gems, "gem")}</Text>
                 </View>
               </View>
               <View style={styles.priceBtn}>
@@ -202,45 +201,58 @@ export default function Gems() {
             </TouchableOpacity>
           ))}
         </View>
-
-        <Text style={styles.legal}>MOCK PurchaseService · dev buttons for now</Text>
       </ScrollView>
-
-      {/* Currency picker modal */}
-      <Modal visible={showCurrencyPicker} transparent animationType="fade" onRequestClose={() => setShowCurrencyPicker(false)}>
-        <View style={styles.currBackdrop}>
-          <View style={styles.currSheet}>
-            <View style={styles.currHandle} />
-            <Text style={styles.currTitle}>currency</Text>
-            <Text style={styles.currSub}>Play Store handles real IAP per country · this preview lets you switch anytime.</Text>
-            <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ padding: SPACING.md, gap: 6 }}>
-              {CURRENCIES.map((c) => {
-                const active = currency === c.code;
-                return (
-                  <TouchableOpacity
-                    key={c.code}
-                    testID={`currency-option-${c.code}`}
-                    onPress={() => changeCurrency(c.code)}
-                    activeOpacity={0.85}
-                    style={[styles.currRow, active && { borderColor: COLORS.romance, backgroundColor: `${COLORS.romance}18` }]}
-                  >
-                    <Text style={{ fontSize: 22 }}>{c.flag}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.currCode}>{c.code}</Text>
-                      <Text style={styles.currLabel}>{c.label}</Text>
-                    </View>
-                    {active && <Ionicons name="checkmark-circle" size={22} color={COLORS.romance} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity onPress={() => setShowCurrencyPicker(false)} style={styles.currClose}>
-              <Text style={{ color: COLORS.text, fontWeight: "800" }}>done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
+  );
+}
+
+/**
+ * One cell of the 7-day streak calendar.
+ * - "claimed": filled flame, subtle romance-tinted background
+ * - "today":   dashed gold outline that PULSES; the CTA of the whole card
+ * - "future":  dim outline
+ * Claimed and today never look identical.
+ */
+function DayCell({ label, state }) {
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    if (state === "today") {
+      pulse.value = withRepeat(
+        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      );
+    } else {
+      pulse.value = 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pulse.value * 0.06 }],
+    shadowOpacity: 0.35 + pulse.value * 0.4,
+  }), []);
+
+  const isClaimed = state === "claimed";
+  const isToday = state === "today";
+  const isFuture = state === "future";
+
+  const container = [
+    styles.streakDay,
+    isClaimed && { backgroundColor: `${COLORS.romance}22`, borderColor: COLORS.romance, borderStyle: "solid" },
+    isToday && { backgroundColor: COLORS.elevated, borderColor: COLORS.gemGold, borderStyle: "dashed", shadowColor: COLORS.gemGold, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
+    isFuture && { opacity: 0.42 },
+  ];
+  const iconName = isClaimed ? "flame" : isToday ? "flame" : "flame-outline";
+  const iconColor = isClaimed ? COLORS.romance : isToday ? COLORS.gemGold : COLORS.secondary;
+  const labelColor = isClaimed ? COLORS.romance : isToday ? COLORS.gemGold : COLORS.secondary;
+
+  const Wrapper: any = isToday ? ReAnimated.View : View;
+  return (
+    <Wrapper style={[container, isToday && animStyle]} testID={`day-cell-${state}`}>
+      <Ionicons name={iconName} size={16} color={iconColor} />
+      <Text style={[styles.streakDayLabel, { color: labelColor }]}>{label}</Text>
+    </Wrapper>
   );
 }
 
@@ -265,25 +277,16 @@ const styles = StyleSheet.create({
   gemBig: { width: 12, height: 12, backgroundColor: COLORS.gemGold, transform: [{ rotate: "45deg" }] },
   dailyGemText: { color: COLORS.gemGold, fontWeight: "900" },
   streakRow: { flexDirection: "row", justifyContent: "space-between" },
-  streakDay: { flex: 1, marginHorizontal: 3, alignItems: "center", padding: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.elevated, gap: 2 },
-  streakDayLabel: { color: COLORS.secondary, fontSize: 10, fontWeight: "700" },
+  streakDay: { flex: 1, marginHorizontal: 3, alignItems: "center", padding: 6, borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: COLORS.border, backgroundColor: COLORS.elevated, gap: 2 },
+  streakDayLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
   claimBtn: { backgroundColor: COLORS.gemGold, padding: 14, borderRadius: RADIUS.md, alignItems: "center" },
-  claimBtnText: { color: COLORS.bg, fontSize: 15, fontWeight: "800" },
+  claimBtnText: { color: COLORS.bg, fontSize: 15, fontWeight: "800", letterSpacing: 0.2 },
+  streakLine: { color: COLORS.secondary, fontSize: 12, textAlign: "center", marginTop: -4 },
   sectionHeader: { color: COLORS.text, fontSize: 18, fontWeight: "900", letterSpacing: -0.3 },
-  sectionNote: { color: COLORS.secondary, fontSize: 11, marginTop: -4 },
   packCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden" },
   packsHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  currencyChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  currencyChipText: { color: COLORS.text, fontWeight: "800", fontSize: 12, letterSpacing: 0.5 },
-  currBackdrop: { flex: 1, backgroundColor: "rgba(10,10,15,0.85)", justifyContent: "flex-end" },
-  currSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: COLORS.border, paddingBottom: SPACING.lg },
-  currHandle: { alignSelf: "center", width: 40, height: 4, backgroundColor: COLORS.border, borderRadius: 999, marginTop: 8 },
-  currTitle: { color: COLORS.text, fontSize: 22, fontWeight: "900", paddingHorizontal: SPACING.lg, marginTop: SPACING.md, letterSpacing: -0.5 },
-  currSub: { color: COLORS.secondary, fontSize: 12, paddingHorizontal: SPACING.lg, marginTop: 4 },
-  currRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.elevated },
-  currCode: { color: COLORS.text, fontWeight: "800", fontSize: 14, letterSpacing: 0.5 },
-  currLabel: { color: COLORS.secondary, fontSize: 12, marginTop: 2 },
-  currClose: { alignSelf: "center", paddingHorizontal: 24, paddingVertical: 12, marginTop: SPACING.sm, borderRadius: RADIUS.pill, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.border },
+  currencyChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  currencyChipText: { color: COLORS.secondary, fontWeight: "700", fontSize: 10, letterSpacing: 0.5 },
   packIcon: { width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: "center", justifyContent: "center" },
   packLabel: { color: COLORS.text, fontWeight: "800" },
   packGems: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
@@ -291,5 +294,4 @@ const styles = StyleSheet.create({
   packGemNum: { color: COLORS.gemGold, fontWeight: "800", fontVariant: ["tabular-nums"] },
   priceBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.border },
   priceText: { color: COLORS.text, fontWeight: "800" },
-  legal: { color: COLORS.muted, fontSize: 11, textAlign: "center" },
 });

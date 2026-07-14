@@ -1,6 +1,6 @@
 // Profile — avatar showcase + stats + endings + logout
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,7 +10,8 @@ import Svg, { Circle } from "react-native-svg";
 import { AvatarPreview } from "@/src/AvatarPreview";
 import { avatarApi, storyApi } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
-import { COLORS, RADIUS, SPACING } from "@/src/theme";
+import { COLORS, RADIUS, SPACING, VOICE, getReaderTitle } from "@/src/theme";
+import { pluralize } from "@/src/utils/format";
 
 export default function Profile() {
   const router = useRouter();
@@ -33,8 +34,14 @@ export default function Profile() {
   const stats = useMemo(() => {
     const progress = user?.progress || {};
     const choicesMade = Object.values(progress).reduce((n, p) => n + (p?.choicesMade?.length || 0), 0);
+    // "Stories read" for the stats card = stories the user opened past the free window.
+    const storiesOpened = Object.values(progress).filter((p) => (p?.chapterIndex || 0) >= 3).length;
+    // "Stories finished" (used for reader title) = distinct storyIds with at least one ending.
+    const owned = user?.ownedEndings || [];
+    const storiesFinished = new Set(owned.map((k) => k.split(":")[0])).size;
     return {
-      storiesRead: Object.values(progress).filter((p) => (p?.chapterIndex || 0) >= 3).length,
+      storiesRead: storiesOpened,
+      storiesFinished,
       choicesMade,
       gemsSpent: Math.max(0, 100 + choicesMade * 5 - (user?.gemBalance || 0)),
     };
@@ -59,6 +66,24 @@ export default function Profile() {
   if (loading) return <View style={styles.loading}><ActivityIndicator color={COLORS.romance} /></View>;
 
   const displayName = user?.avatarConfig?.displayName || user?.displayName || "MC";
+  const readerTitle = getReaderTitle(stats.storiesFinished);
+
+  const confirmLogout = () => {
+    Haptics.selectionAsync();
+    Alert.alert(
+      VOICE.logoutConfirmTitle,
+      VOICE.logoutConfirmBody,
+      [
+        { text: VOICE.logoutConfirmNo, style: "cancel" },
+        {
+          text: VOICE.logoutConfirmYes,
+          style: "destructive",
+          onPress: async () => { await logout(); router.replace("/onboarding"); },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
@@ -93,9 +118,9 @@ export default function Profile() {
             </View>
           </TouchableOpacity>
           <Text style={styles.name}>{displayName}</Text>
-          <View style={styles.badge}>
-            <Ionicons name="book" size={12} color={COLORS.romance} />
-            <Text style={styles.badgeText}>Lore Seeker</Text>
+          <View style={[styles.badge, { backgroundColor: `${readerTitle.accent}22`, borderColor: readerTitle.accent }]} testID="profile-reader-title">
+            <Ionicons name="book" size={12} color={readerTitle.accent} />
+            <Text style={[styles.badgeText, { color: readerTitle.accent }]}>{readerTitle.label}</Text>
           </View>
           <TouchableOpacity
             testID="profile-edit-avatar"
@@ -119,9 +144,9 @@ export default function Profile() {
         <View style={styles.section}>
           <View style={styles.streakCard}>
             <Ionicons name="flame" size={28} color={COLORS.gemGold} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.streakNum}>{user?.streak ?? 0} days</Text>
-              <Text style={styles.streakCap}>current streak · keep it going</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.streakNum} numberOfLines={1}>{pluralize(user?.streak ?? 0, "day")}</Text>
+              <Text style={styles.streakCap} numberOfLines={1}>current streak · keep it going</Text>
             </View>
           </View>
         </View>
@@ -169,7 +194,7 @@ export default function Profile() {
         <View style={styles.section}>
           <TouchableOpacity
             testID="profile-logout"
-            onPress={async () => { await logout(); router.replace("/onboarding"); }}
+            onPress={confirmLogout}
             style={styles.logoutBtn}
           >
             <Text style={styles.logoutText}>log out</Text>
@@ -258,9 +283,9 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { color: COLORS.text, fontSize: 16, fontWeight: "800" },
   sectionLink: { color: COLORS.secondary, fontSize: 12 },
-  streakCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  streakNum: { color: COLORS.text, fontWeight: "900", fontSize: 18 },
-  streakCap: { color: COLORS.secondary, fontSize: 12, marginTop: 2 },
+  streakCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, minHeight: 72, overflow: "hidden" },
+  streakNum: { color: COLORS.text, fontWeight: "900", fontSize: 18, letterSpacing: -0.2, includeFontPadding: false, lineHeight: 22 },
+  streakCap: { color: COLORS.secondary, fontSize: 12, marginTop: 2, includeFontPadding: false, lineHeight: 16 },
   endingChip: { width: 100, gap: 4, alignItems: "center" },
   endingCover: { width: 80, height: 100, borderRadius: RADIUS.sm, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.border, alignItems: "flex-end", padding: 6 },
   rarityDot: { width: 10, height: 10, borderRadius: 999 },
