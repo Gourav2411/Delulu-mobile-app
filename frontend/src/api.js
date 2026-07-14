@@ -19,9 +19,9 @@ export async function clearToken() {
   return storage.secureRemove(TOKEN_KEY);
 }
 
-async function request(method, path, body) {
+async function request(method, path, body, extraHeaders) {
   const token = await getToken();
-  const headers = { "Content-Type": "application/json" };
+  const headers = { "Content-Type": "application/json", ...(extraHeaders || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API}${path}`, {
     method,
@@ -55,10 +55,10 @@ async function request(method, path, body) {
 }
 
 export const api = {
-  get: (p) => request("GET", p),
-  post: (p, b) => request("POST", p, b),
-  put: (p, b) => request("PUT", p, b),
-  del: (p) => request("DELETE", p),
+  get: (p, extraHeaders) => request("GET", p, undefined, extraHeaders),
+  post: (p, b, extraHeaders) => request("POST", p, b, extraHeaders),
+  put: (p, b, extraHeaders) => request("PUT", p, b, extraHeaders),
+  del: (p, extraHeaders) => request("DELETE", p, undefined, extraHeaders),
 };
 
 // Convenience wrappers
@@ -80,7 +80,24 @@ export const storyApi = {
   skipTimer: (payload) => api.post("/chapters/skip-timer", payload),
   recordEnding: (payload) => api.post("/endings/record", payload),
   shareEnding: (payload) => api.post("/endings/share", payload).catch(() => ({})),
+  cast: (payload) => api.post("/story/cast", payload),
 };
+
+export const identityApi = {
+  get: () => api.get("/users/identity"),
+  save: (payload) => api.post("/users/identity", payload),
+};
+
+export const adminApi = {
+  _pass: null,
+  setPass(pass) { this._pass = pass; },
+  _headers() { return this._pass ? { "X-Admin-Pass": this._pass } : {}; },
+  listStories() { return api.get("/admin/stories", this._headers()); },
+  validateStory(id) { return api.get(`/admin/stories/${id}/validate`, this._headers()); },
+  preview(payload) { return api.post("/admin/preview", payload, this._headers()); },
+};
+
+// (no other request-level hooks needed)
 
 export const avatarApi = {
   catalog: () => api.get("/avatar/catalog"),

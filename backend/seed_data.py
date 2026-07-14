@@ -169,7 +169,7 @@ def build_story():
             m("c1m4", "rian", "Cute. That's exactly what lost people say.", 1600, "flirty", "large"),
             m("c1m5", "PLAYER", "And what would a not-lost person say?", 900, "flirty", "small"),
             m("c1m6", "rian", "\"Come sit with me.\"", 1500, "flirty", "large"),
-            m("c1m7", "narrator", "He slides a second glass across the bar without asking.", 1400, "neutral", "small",
+            m("c1m7", "narrator", "{c_rian_they} slides a second glass across the bar without asking.", 1400, "neutral", "small",
               sfx="CLINK"),
             m("c1m8", "PLAYER", "", 500, "neutral", "small", choice={
                 "options": [
@@ -328,7 +328,17 @@ def build_story():
     ]
 
     characters = [
-        {"id": "rian",  "name": "Rian Aster",    "role": "Male Lead",   "avatarUrl": RIAN_PORTRAITS["neutral"],  "portraitUrls": RIAN_PORTRAITS},
+        # Male Lead — Rian — currently the sole variant (femme "Riana" wired up
+        # as a schema placeholder using the same portrait pack; real femme
+        # portraits will be checked in via github per user).
+        {
+            "id": "rian", "name": "Rian Aster", "role": "Male Lead", "isLoveInterest": True,
+            "avatarUrl": RIAN_PORTRAITS["neutral"], "portraitUrls": RIAN_PORTRAITS,
+            "variants": {
+                "masc": {"name": "Rian Aster",  "avatarUrl": RIAN_PORTRAITS["neutral"], "portraitUrls": RIAN_PORTRAITS,  "bio": "cold billionaire with a rooftop obsession"},
+                "femme": {"name": "Riana Aster", "avatarUrl": MEERA_PORTRAITS["neutral"], "portraitUrls": MEERA_PORTRAITS, "bio": "cold heiress with a rooftop obsession"},
+            },
+        },
         {"id": "meera", "name": "Meera",         "role": "Best Friend", "avatarUrl": MEERA_PORTRAITS["neutral"], "portraitUrls": MEERA_PORTRAITS},
         {"id": "karan", "name": "Karan",         "role": "Rival",       "avatarUrl": KARAN_PORTRAITS["neutral"], "portraitUrls": KARAN_PORTRAITS},
         {"id": "narrator", "name": "Narrator",   "role": "narration",   "avatarUrl": None, "portraitUrls": {}},

@@ -185,6 +185,20 @@ export default function Profile() {
             <EndingProgressRing collected={endings.length} total={totalEndings || endings.length || 1} />
             <Ionicons name="chevron-forward" size={16} color={COLORS.secondary} />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            testID="profile-my-identity"
+            onPress={() => { Haptics.selectionAsync(); router.push("/identity"); }}
+            style={styles.rowItem}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="person-circle" size={18} color={COLORS.scifi} />
+            <Text style={styles.rowText}>my identity</Text>
+            <Text style={styles.identityHint} numberOfLines={1}>
+              {(user?.identity?.playerGender || "female")} · loves {(user?.identity?.romancePreference || "men")}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.secondary} />
+          </TouchableOpacity>
           <RowItem icon="trophy" label="achievements" />
           <RowItem icon="bookmark" label="bookmarks" />
           <RowItem icon="settings" label="settings" />
@@ -293,6 +307,7 @@ const styles = StyleSheet.create({
   endingPct: { color: COLORS.secondary, fontSize: 10 },
   rowItem: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   rowText: { flex: 1, color: COLORS.text, fontWeight: "600" },
+  identityHint: { color: COLORS.secondary, fontSize: 11, fontWeight: "600", maxWidth: 150, textAlign: "right" },
   logoutBtn: { padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.elevated, borderWidth: 1, borderColor: COLORS.danger, alignItems: "center" },
   logoutText: { color: COLORS.danger, fontWeight: "700" },
 });
